@@ -3,8 +3,22 @@
 **Harmattan Home** — the Nokia N9's MeeGo 1.2 Harmattan home screen, rebuilt for Android from the N9's own firmware.
 
 > **BETA**
+<<<<<<< Updated upstream
+=======
 
----
+![Recents, Today and Applications](docs/mockups/views.png)
+>>>>>>> Stashed changes
+
+<p align="center">
+  <img src="docs/mockups/today_held.png" width="24%" alt="Today held: dimmed, with ✕ on notifications">
+  <img src="docs/mockups/folder.png" width="24%" alt="An open folder">
+  <img src="docs/mockups/editor.png" width="24%" alt="The Home editor">
+  <img src="docs/mockups/customize.png" width="24%" alt="Customize Today, with its live preview">
+</p>
+
+*As it looks out of the box, with demo content.*
+
+**Clips:** [swiping between views](docs/mockups/clips/swipe.mp4) · [folders](docs/mockups/clips/folder.mp4) · [Home editor](docs/mockups/clips/editor.mp4)
 
 ## Why it's the most authentic Harmattan launcher
 
@@ -16,6 +30,10 @@ Most "N9-style" launchers are redrawn from screenshots. Harmattan Home isn't. It
 - **Colors, fonts and type sizes** come from the Blanco theme's constants. The text is Nokia Pure, from the firmware.
 - **The motion is the N9's.** The `overshotbezier` curve was read out of `libmeegotouchcore` as a 100-point table, and the kinetic scrolling physics (`MPhysics2DPanning`: friction, edge spring, bounce) were decoded from the ARM machine code and re-implemented exactly.
 - **The weather widget** is laid out from the N9's AccuWeather home widget, decompressed from inside its extension library, with the N9's own 20 weather icons.
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
 
 ### Upscaled for today's screens
 
@@ -27,7 +45,7 @@ The firmware only ships its artwork at the N9's 480 × 854 resolution. Instead o
 - **Fits your phone:** the status bar sits in the camera cutout, clears rounded corners, and works with the gesture pill. You can use the N9 status bar or Android's own.
 - **Per-panel sizes:** Applications, Recents, Today and the status bar can each be made bigger or smaller, along with text and icon size.
 - **Your icons, your way:** keep the N9's original icons for Phone, Messages, Web, Camera and friends; cut every other app to the N9 squircle (or circle, rounded, square…); or use any Nova / ADW icon pack.
-- **Wallpaper** behind Today, with a dark top so the date and weather stay readable, and a soft blur behind the other views.
+- **Wallpaper** behind Today, with a dark top so the date and weather stay readable, a soft blur behind the other views, and an optional parallax drift as you swipe between them.
 
 ### The full experience with Shizuku
 
@@ -56,19 +74,33 @@ Without Shizuku, everything still works: Recents follows the apps you open, and 
 
 ### Today
 - The date with an N9 weather widget. Weather comes from [Open-Meteo](https://open-meteo.com/) (free, no account), for your location or a city you choose, in °C or °F.
-- **Notifications** with each app's own icon. Music shows its album art with the app as a badge. Tap to open and clear; ongoing ones (charging, USB…) can be shown or hidden.
+- **Notifications** with each app's own icon. Messages show the sender's photo and music its album art, each with the app as a badge. Tap to open and clear; system ones (charging, USB…) can be shown or hidden.
+- **Hold Today** to dim it, as Applications and Recents do in edit mode: tap ✕ on a notification to dismiss it, or **Home editor** to customize.
 - **Feed:**
   - posts from social apps' notifications, kept after the notification goes;
   - public posts from Bluesky, Mastodon, YouTube, Reddit or Tumblr accounts, or any website with an RSS / Atom feed;
-  - each post shows its source's picture with the service's badge, and opens in its app when it's installed.
+  - each post shows its source's picture (or its first letter on grey) with the service's badge, and opens in its app when it's installed.
 - **Back to top** once you've scrolled the feed.
 
 ### Everywhere
 - Pull down at the top of any view for quick settings (or notifications).
 - An N9 status bar that shows Android's real signal, network name, Wi-Fi activity and battery.
 
-### Home settings
-Hold an empty part of **Today** and tap **Home settings**. Home zooms out to show the three views side by side; pick one and tap **Customize** for its settings, each with a live preview.
+### Home editor
+Hold an empty part of **Today** and tap **Home editor**. Home zooms out to show the three views side by side; pick one and tap **Customize** for its settings, each with a live preview. Settings that affect every view (system notifications, status bar, scroll bars, gesture pill) are under **System** in Customize Today.
+
+---
+
+## What's new in this beta
+
+- **Home editor:** the hold menu in Today is now called Home editor. Customize sheets drop their titles to give the live preview more room, and the shared settings sit together under **System** in Customize Today.
+- **Today in edit mode:** holding Today dims it like the other views and puts ✕ on every notification you can dismiss.
+- **Message photos:** text and chat notifications show the contact's photo with the app's badge.
+- **Parallax wallpaper:** the wallpaper drifts slightly as you swipe between views (on by default; switch it off in Customize Today).
+- **Smoother folders:** a folder near the bottom of Applications now grows and scrolls into view in one motion, and closes the same way.
+- **Back to top** sits on a darker band, and touches around it no longer open the post underneath or bring up the Home editor.
+- **Feed letter tiles** for sources without a picture are now a neutral grey.
+- **Fixes:** the wallpaper no longer jumps when you leave the Home editor, and the screen no longer flashes black as the Home editor opens.
 
 ---
 
@@ -82,12 +114,12 @@ Hold an empty part of **Today** and tap **Home settings**. Home zooms out to sho
 ## Install
 
 1. Download the latest APK from [Releases](../../releases) and install it.
-2. Open **Home settings** from Android's app info for Harmattan Home, or set it as your home app and hold an empty part of Today.
+2. Open **Home settings** from Android's app info for Harmattan Home, or set it as your home app and hold an empty part of Today and tap **Home editor**.
 3. Under **Permissions**, allow these. Each is optional, but the views they feed stay empty without them:
    - **Default home app**
    - **Notifications**: for Today and the feed.
    - **Usage access**: so Recents follows apps you open from elsewhere.
-4. *(Optional)* Install and start Shizuku, then turn on **Customize Recents → Match system Recents**.
+4. *(Optional)* Install and start Shizuku, then turn on **Match system Recents** (Home editor → Recents → Customize).
 
 ## Build
 
@@ -101,7 +133,13 @@ The APK lands in `app/build/outputs/apk/debug/`. To regenerate the high-resoluti
 python tools/hd_assets.py
 ```
 
-(Needs Python 3 with Pillow.)
+(Needs Python 3 with Pillow.) [`tools/mockups.py`](tools/mockups.py) takes screenshots and clips from a connected phone and frames them for this page. For clean shots, a debug build has a demo mode that swaps in made-up notifications, feed posts, weather and Recents, and fills Applications with the N9's own apps:
+
+```bash
+adb shell am start -n com.amiigo.harmattan/.HomeActivity --ez demo true
+```
+
+(`--ez demo false` turns it off.)
 
 ---
 

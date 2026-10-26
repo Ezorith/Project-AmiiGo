@@ -59,13 +59,19 @@ class HomeActivity : Activity() {
         home.pagingEnabled = false
         home.gap = N9.px(28f) / ZOOM
         home.showNeighbours = true
-        // The neighbours sit outside home's own bounds: let them draw.
-        home.clipChildren = false; root.clipChildren = false
         home.pivotX = home.width / 2f; home.pivotY = home.height / 2f
         customize.visibility = View.VISIBLE
         customize.title = panelNames[page]
         // The wallpaper goes with Today into its card; Applications and Recents stay on black.
-        events.wallpaperLayer.refresh(); events.wallpaperLayer.active = true
+        // Drawn to line up exactly with the full-screen wallpaper (no jump when they swap).
+        events.wallpaperLayer.apply {
+            val k = (events.parent as? ScaledFrame)?.k ?: 1f
+            screenTop = home.top / k
+            screenH = root.height / k
+            topH = wallpaper.topH / k
+            parallaxWidth = if (Wallpaper.parallax(this@HomeActivity)) (root.width * Wallpaper.PARALLAX / k).toInt() else 0
+            refresh(); active = true
+        }
         wallpaper.active = false
         placeCustomize()
         zoomTo(1f, animated)
@@ -77,7 +83,6 @@ class HomeActivity : Activity() {
         zoomTo(0f, animated) {
             home.showNeighbours = false; home.gap = 0f
             wallpaper.active = true; events.wallpaperLayer.active = false
-            home.clipChildren = true; root.clipChildren = true
             home.pagingEnabled = true
             customize.visibility = View.GONE
         }
@@ -154,6 +159,9 @@ class HomeActivity : Activity() {
         wallpaper = WallpaperView(this)
         root.addView(wallpaper, FrameLayout.LayoutParams(-1, -1))
         root.addView(home, FrameLayout.LayoutParams(-1, -1).apply { topMargin = sb })
+        // The Home editor's side panels sit outside home's bounds. Set once: switching this as the
+        // editor opened flashed a black frame. (Off-screen panels are hidden, so nothing spills.)
+        home.clipChildren = false; root.clipChildren = false
         root.addView(gradient, FrameLayout.LayoutParams(-1, N9.ipx(10f)).apply { topMargin = sb })
         root.addView(statusBar, FrameLayout.LayoutParams(-1, -2))
         customize = CustomizeOverlay(this,
@@ -173,7 +181,10 @@ class HomeActivity : Activity() {
         SystemRecents.onPermissionResult { root.post { Apps.refreshSystemRecents() } }
         home.onPageSettled = { page -> onPage(page) }
         // Sharp behind Today, blurred towards the other panels as they slide in.
-        home.onOffsetChanged = { o -> wallpaper.blurAmount = WallpaperView.distance(o, EVENTS, 3) }
+        home.onOffsetChanged = { o ->
+            wallpaper.blurAmount = WallpaperView.distance(o, EVENTS, 3)
+            wallpaper.drift = WallpaperView.drift(o, EVENTS, 3)
+        }
         home.snapTo(LAUNCHER, false)
         EventStore.addListener { statusBar.notifier = EventStore.unseen }
 
@@ -305,6 +316,7 @@ class HomeActivity : Activity() {
         wallpaper.topH = statusBar.barHeight + N9.px(110f) * Apps.todayScale
         wallpaper.refresh()
         wallpaper.blurAmount = WallpaperView.distance(home.offset, EVENTS, 3)
+        wallpaper.drift = WallpaperView.drift(home.offset, EVENTS, 3)
         reopenCustomize?.let { p ->
             reopenCustomize = null
             if (customizing) { customize.title = panelNames[home.current]; zoomTo(1f, false) }
@@ -347,8 +359,12 @@ class HomeActivity : Activity() {
         switcher.visibleNow = false
     }
 
+    /** Demo mode switched: Applications re-reads its (filtered) list. */
+    fun demoChanged() = launcher.grid.sync()
+
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
+        Demo.handle(this, intent)
         if (intent?.hasCategory(Intent.CATEGORY_HOME) != true) return
         val wasVisible = resumed && hasWindowFocus()
         if (customizing) { reopenCustomize = null; exitCustomize(wasVisible); return }

@@ -59,10 +59,11 @@ object EventStore {
     private val listeners = mutableListOf<() -> Unit>()
 
     var service: EventsListenerService? = null
-    var notifications: List<EventItem> = emptyList()
-        private set
-    var feed: List<EventItem> = emptyList()
-        private set
+    /** What Today shows: the made-up ones while [Demo] is on, else the real notifications. */
+    val notifications: List<EventItem> get() = Demo.items ?: real
+    private var real: List<EventItem> = emptyList()
+    val feed: List<EventItem> get() = Demo.feed ?: realFeed
+    private var realFeed: List<EventItem> = emptyList()
     var unseen = false
         private set
 
@@ -100,7 +101,7 @@ object EventStore {
         app = ctx.applicationContext
         prefs = app.getSharedPreferences("events", Context.MODE_PRIVATE)
         MediaWatcher.addListener { service?.let { s -> runCatching { setActive(s.activeNotifications ?: emptyArray()) } } }
-        feed = loadFeed()
+        realFeed = loadFeed()
         // Posts saved before they remembered their source are pruned below; fetch fresh ones soon.
         if (!prefs.getBoolean("origins_v2", false)) prefs.edit().putBoolean("origins_v2", true).putLong("last_update", 0L).apply()
         prune()
@@ -113,12 +114,12 @@ object EventStore {
     private fun prune() {
         val urls = rssSources.toSet()
         val apps = feedApps
-        val kept = feed.filter { i ->
+        val kept = realFeed.filter { i ->
             if (i.key.startsWith("rss:")) i.origin != null && i.origin in urls
             else i.pkg.isEmpty() || i.pkg in apps || (!prefs.contains("feed_apps"))
         }
-        if (kept.size != feed.size) {
-            feed = kept
+        if (kept.size != realFeed.size) {
+            realFeed = kept
             changed()
             io.execute { saveFeed(kept) }
         }
@@ -127,6 +128,7 @@ object EventStore {
     fun addListener(l: () -> Unit) { listeners += l }
     fun removeListener(l: () -> Unit) { listeners -= l }
     private fun changed() = main.post { listeners.forEach { it() } }
+    fun demoChanged() = changed()
 
     fun markSeen() { if (unseen) { unseen = false; changed() } }
 
@@ -138,7 +140,7 @@ object EventStore {
         for (sbn in list) {
             if (isFeed(sbn)) feedItem(sbn)?.let { feedItems += it } else toItem(sbn)?.let { items += it }
         }
-        notifications = items.sortedByDescending { it.time }
+        real = items.sortedByDescending { it.time }
         if (feedItems.isNotEmpty()) mergeFeed(feedItems) else changed()
     }
 
@@ -148,20 +150,31 @@ object EventStore {
             return
         }
         val item = toItem(sbn) ?: return
-        notifications = (listOf(item) + notifications.filter { it.key != item.key }).sortedByDescending { it.time }
+        real = (listOf(item) + real.filter { it.key != item.key }).sortedByDescending { it.time }
         unseen = true
         changed()
     }
 
     fun onRemoved(sbn: StatusBarNotification) {
         val before = notifications.size
-        notifications = notifications.filter { it.key != sbn.key }
+        real = real.filter { it.key != sbn.key }
         if (notifications.size != before) changed()
     }
 
     fun clearNotifications() {
+        // Demo mode: only the made-up ones go; the real notifications are left alone.
+        if (Demo.items != null) { Demo.items?.filter { it.clearable }?.forEach { Demo.dismiss(it.key) }; changed(); return }
         runCatching { service?.cancelAllNotifications() }
-        notifications = notifications.filter { !it.clearable }
+        real = real.filter { !it.clearable }
+        changed()
+    }
+
+    /** Dismiss one notification (its ✕ while Today is held), here and in the system shade. */
+    fun dismiss(item: EventItem) {
+        if (!item.clearable) return
+        if (item.key.startsWith("demo:")) { Demo.dismiss(item.key); changed(); return }
+        runCatching { service?.cancelNotification(item.key) }
+        real = real.filter { it.key != item.key }
         changed()
     }
 
@@ -177,7 +190,7 @@ object EventStore {
         // Once opened, a notification goes away, here and in the system shade (ongoing ones stay).
         if (item.clearable && notifications.any { it.key == item.key }) {
             runCatching { service?.cancelNotification(item.key) }
-            notifications = notifications.filter { it.key != item.key }
+            real = real.filter { it.key != item.key }
             changed()
         }
     }
@@ -291,6 +304,11 @@ object EventStore {
                 ?: n.getLargeIcon()?.let { loadIcon(it, sbn.packageName) }?.let { drawableBitmap(it, size, size) }
             if (art != null) return withBadge(roundedSquare(art, size), appBadge(sbn.packageName))
         }
+        // Messages: the sender's photo with the app as a badge, as feed posts show their source.
+        senderPhoto(sbn, size)?.let { photo ->
+            val appIcon = Apps.installed.firstOrNull { it.pkg == sbn.packageName }?.icon
+            return withBadge(masked(photo), appBadge(sbn.packageName) ?: appIcon)
+        }
         // The app's own icon, as the Applications view draws it (shape and icon style included).
         (Apps.installed.firstOrNull { it.pkg == sbn.packageName && it.user == sbn.user }
             ?: Apps.installed.firstOrNull { it.pkg == sbn.packageName })
@@ -317,6 +335,21 @@ object EventStore {
         }
         return out
     }
+
+    /** A message's sender photo (MessagingStyle's last sender, else the large icon), or null for other notifications. */
+    private fun senderPhoto(sbn: StatusBarNotification, size: Int): Bitmap? = runCatching {
+        val n = sbn.notification
+        val e = n.extras
+        @Suppress("DEPRECATION")
+        val msgs = e.getParcelableArray(Notification.EXTRA_MESSAGES)
+        val isMessage = n.category == Notification.CATEGORY_MESSAGE || msgs != null ||
+            e.getString(Notification.EXTRA_TEMPLATE)?.contains("MessagingStyle") == true
+        if (!isMessage) return@runCatching null
+        @Suppress("DEPRECATION")
+        val sender = (msgs?.lastOrNull() as? android.os.Bundle)?.getParcelable<android.app.Person>("sender_person")?.icon
+        val icon = sender ?: n.getLargeIcon() ?: return@runCatching null
+        loadIcon(icon, sbn.packageName)?.let { drawableBitmap(it, size, size) }
+    }.getOrNull()
 
     private fun loadIcon(icon: Icon?, pkg: String): Drawable? = runCatching {
         icon?.loadDrawable(app.createPackageContext(pkg, 0))
@@ -448,11 +481,15 @@ object EventStore {
 
     fun mergeFeed(items: List<EventItem>) {
         val byKey = LinkedHashMap<String, EventItem>()
-        for (i in feed) byKey[i.key] = i
+        // Older posts from the same source take its latest picture (a new icon, or the letter tile's new colour).
+        val fresh = items.filter { it.origin != null && it.icon != null }.associate { (it.origin + "|" + it.source) to it.icon }
+        for (i in realFeed) byKey[i.key] = fresh[i.origin + "|" + i.source]?.takeIf { i.origin != null && it !== i.icon }?.let { icon ->
+            EventItem(i.key, i.pkg, i.title, i.body, i.subtitle, i.time, icon, i.image, i.intent, i.link, i.source, i.clearable, i.origin)
+        } ?: i
         for (i in items) byKey[i.key] = i
-        feed = byKey.values.sortedByDescending { it.time }.take(MAX_FEED)
+        realFeed = byKey.values.sortedByDescending { it.time }.take(MAX_FEED)
         changed()
-        val snapshot = feed
+        val snapshot = realFeed
         io.execute { saveFeed(snapshot) }
     }
 

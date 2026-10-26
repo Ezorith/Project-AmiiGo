@@ -32,7 +32,7 @@ class EventsPanel(ctx: Context) : FrameLayout(ctx) {
     val pannable = PannableView(ctx)
     private val column = EventsColumn(ctx)
 
-    private val toolbar = EditToolbar(ctx, listOf(ctx.getString(R.string.settings_name) to { hideToolbar(); (ctx as? HomeActivity)?.enterCustomize() ?: openHomeSettings(ctx) }))
+    private val toolbar = EditToolbar(ctx, listOf(ctx.getString(R.string.home_editor) to { hideToolbar(); (ctx as? HomeActivity)?.enterCustomize() ?: openHomeSettings(ctx) }))
     private val backToTop = BackToTopButton(ctx) { pannable.scrollToTop(true) }
 
     /** Today's own copy of the wallpaper, used while Home settings zooms out (it scales with Today). */
@@ -68,7 +68,7 @@ class EventsPanel(ctx: Context) : FrameLayout(ctx) {
         backToTop.show(fh != null && EventStore.feed.isNotEmpty() && pannable.pos > fh.top + fh.height && !toolbar.isUp)
     }
 
-    fun hideToolbar() { if (toolbar.isUp) { toolbar.show(false); updateBackToTop() } }
+    fun hideToolbar() { if (toolbar.isUp) setEditing(false) }
 
     // Hold anywhere: the toolbar with Home settings (the touch then no longer opens what's under it).
     private var downX = 0f
@@ -81,7 +81,26 @@ class EventsPanel(ctx: Context) : FrameLayout(ctx) {
         val cancel = MotionEvent.obtain(now, now, MotionEvent.ACTION_CANCEL, downX, downY, 0)
         superDispatch(cancel); cancel.recycle()
         backToTop.show(false)
-        toolbar.show(true)
+        setEditing(true)
+    }
+
+    /** Held: the toolbar, Today dimmed as Applications and Recents are, and ✕ on dismissable notifications. */
+    private fun setEditing(on: Boolean) {
+        toolbar.show(on)
+        column.setEditing(on)
+        if (!on) updateBackToTop()
+    }
+
+    private var badgeDown: Row? = null
+    private var editTap = false
+
+    /** The row whose ✕ is under ([x], [y]) in this view's coordinates. */
+    private fun badgeAt(x: Float, y: Float): Row? {
+        val cx = x - pannable.left - column.left
+        val cy = y - pannable.top - column.top - column.translationY
+        return column.rowsList().firstOrNull { r ->
+            r.dismissable && r.badgeRect().apply { offset(r.left + r.translationX, r.top + r.translationY); inset(-N9.px(10f), -N9.px(10f)) }.contains(cx, cy)
+        }
     }
 
     private fun superDispatch(e: MotionEvent) = super.dispatchTouchEvent(e)
@@ -91,13 +110,33 @@ class EventsPanel(ctx: Context) : FrameLayout(ctx) {
             MotionEvent.ACTION_DOWN -> {
                 held = false; downX = e.x; downY = e.y
                 val onToolbar = toolbar.isUp && e.y >= toolbar.top + toolbar.translationY
-                val onButton = backToTop.hits(e.x, e.y)
-                if (!onToolbar && toolbar.isUp) hideToolbar()
-                if (!onToolbar && !onButton) postDelayed(hold, LauncherGrid.HOLD_MS)
+                // Back to top and the dark band behind it never bring up the toolbar.
+                val onButton = backToTop.inStrip(e.y)
+                editTap = false
+                if (toolbar.isUp && !onToolbar) {
+                    // Held Today: ✕ dismisses a notification; any other tap puts it back (scrolling still works).
+                    badgeDown = badgeAt(e.x, e.y)
+                    if (badgeDown != null) return true
+                    editTap = true
+                } else if (!onToolbar && !onButton) postDelayed(hold, LauncherGrid.HOLD_MS)
             }
-            MotionEvent.ACTION_MOVE -> if (kotlin.math.abs(e.x - downX) > N9.px(LauncherGrid.MOVE_THRESHOLD) ||
-                kotlin.math.abs(e.y - downY) > N9.px(LauncherGrid.MOVE_THRESHOLD)) removeCallbacks(hold)
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> removeCallbacks(hold)
+            MotionEvent.ACTION_MOVE -> {
+                if (badgeDown != null) return true
+                if (kotlin.math.abs(e.x - downX) > N9.px(LauncherGrid.MOVE_THRESHOLD) ||
+                    kotlin.math.abs(e.y - downY) > N9.px(LauncherGrid.MOVE_THRESHOLD)) { removeCallbacks(hold); editTap = false }
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                removeCallbacks(hold)
+                badgeDown?.let { r ->
+                    badgeDown = null
+                    if (e.actionMasked == MotionEvent.ACTION_UP && badgeAt(e.x, e.y) === r) {
+                        performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                        (r as? BannerRow)?.item?.let { item -> column.clearAll(setOf("n:" + item.key)) { EventStore.dismiss(item) } }
+                    }
+                    return true
+                }
+                if (editTap && e.actionMasked == MotionEvent.ACTION_UP) { editTap = false; super.dispatchTouchEvent(e); hideToolbar(); return true }
+            }
         }
         if (held) return true
         return super.dispatchTouchEvent(e)
@@ -166,6 +205,17 @@ class EventsColumn(ctx: Context) : ViewGroup(ctx) {
     private var laidOut = false
 
     fun rowFor(key: String) = rows[key]
+    fun rowsList(): List<Row> = rows.values.filter { it.tag != "gone" }
+
+    /** Today held: rows dim and dismissable notifications show their ✕. */
+    var editing = false
+        private set
+
+    fun setEditing(on: Boolean) {
+        if (editing == on) return
+        editing = on
+        for (r in rows.values) r.setEdit(on, animated = true)
+    }
 
     fun setRows(spec: List<Pair<String, () -> Row>>, notes: List<EventItem>, feed: List<EventItem>) {
         val byKey = notes.associateBy { "n:" + it.key } + feed.associateBy { "f:" + it.key }
@@ -182,6 +232,7 @@ class EventsColumn(ctx: Context) : ViewGroup(ctx) {
             } else {
                 existing?.let { removeView(it) }
                 make().also { r ->
+                    r.setEdit(editing, animated = false)
                     addView(r)
                     if (laidOut) { r.alpha = 0f; r.tag = "new" }
                 }
@@ -254,6 +305,56 @@ abstract class Row(ctx: Context) : View(ctx) {
     abstract fun heightFor(width: Int): Int
     open fun onTap() {}
 
+    // Held Today (edit-mode-brightness 0.5, as Recents tiles), and the ✕ on dismissable notifications.
+    private var dim = 0f
+    private var badge = 0f
+    private var editAnim: android.animation.ValueAnimator? = null
+    private var editing = false
+    open val dismissable: Boolean get() = false
+    private val dimPaint = android.graphics.Paint().apply { color = 0xFF000000.toInt() }
+    private val badgePaint = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG)
+
+    /** Where the ✕ sits, in this row's coordinates (top right of the banner, as on a Recents tile). */
+    open fun badgeRect(): RectF {
+        val size = N9.px(48f)
+        val r = width - N9.px(14f) + N9.px(4f)
+        return RectF(r - size, N9.px(2f), r, N9.px(2f) + size)
+    }
+
+    fun setEdit(on: Boolean, animated: Boolean) {
+        editing = on
+        editAnim?.cancel()
+        val toDim = if (on) 0.5f else 0f
+        val toBadge = if (on && dismissable) 1f else 0f
+        if (!animated) { dim = toDim; badge = toBadge; invalidate(); return }
+        val d0 = dim; val b0 = badge
+        // As Recents edit mode: 250ms outexpo; the ✕ grows in with overshotbezier.
+        editAnim = android.animation.ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 250
+            addUpdateListener {
+                val t = it.animatedFraction
+                dim = d0 + (toDim - d0) * Ease.outExpo.getInterpolation(t)
+                badge = b0 + (toBadge - b0) * (if (on) Ease.overshotBezier.getInterpolation(t) else Ease.outExpo.getInterpolation(t))
+                invalidate()
+            }
+            start()
+        }
+    }
+
+    override fun draw(canvas: Canvas) {
+        super.draw(canvas)
+        if (dim > 0.001f) { dimPaint.alpha = (dim * 255).toInt().coerceIn(0, 255); canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), dimPaint) }
+        if (badge > 0.001f) {
+            val r = badgeRect(); val half = r.width() / 2f * badge
+            canvas.drawBitmap(closeBmp(context), null, RectF(r.centerX() - half, r.centerY() - half, r.centerX() + half, r.centerY() + half), badgePaint)
+        }
+    }
+
+    companion object {
+        private var close: android.graphics.Bitmap? = null
+        fun closeBmp(ctx: Context) = close ?: N9.bitmap(ctx, R.drawable.n9_close_thumbnail).also { close = it }
+    }
+
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = MeasureSpec.getSize(widthMeasureSpec)
         setMeasuredDimension(w, heightFor(w))
@@ -261,7 +362,7 @@ abstract class Row(ctx: Context) : View(ctx) {
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(e: MotionEvent): Boolean {
-        if (!pressable) return false
+        if (!pressable || editing) return false
         when (e.actionMasked) {
             MotionEvent.ACTION_DOWN -> { downX = e.x; downY = e.y; postDelayed(pressRunnable, 80) }
             MotionEvent.ACTION_MOVE -> if (abs(e.x - downX) > N9.px(20f) || abs(e.y - downY) > N9.px(20f)) { removeCallbacks(pressRunnable); pressedNow = false }
@@ -488,6 +589,14 @@ class BannerRow(ctx: Context, item: EventItem) : Row(ctx), ItemRow {
     }
 
     override fun onTap() = EventStore.open(item)
+    override val dismissable: Boolean get() = item.clearable
+
+    /** On the icon's top right corner, as in Applications' edit mode, clear of the text. */
+    override fun badgeRect(): RectF {
+        val size = N9.px(44f)
+        val cx = N9.px(2f + 64f - 4f); val cy = margin + N9.px(10f + 12f)
+        return RectF(cx - size / 2f, cy - size / 2f, cx + size / 2f, cy + size / 2f)
+    }
 }
 
 /**

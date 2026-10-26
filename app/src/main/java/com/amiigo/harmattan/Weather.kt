@@ -44,22 +44,23 @@ object Weather {
 
     fun addListener(l: () -> Unit) { listeners += l }
     private fun changed() = main.post { listeners.forEach { it() } }
+    fun demoChanged() = changed()
 
-    val mode: String get() = prefs.getString("mode", MODE_OFF)!!
-    val hasData: Boolean get() = mode != MODE_OFF && prefs.contains("temp_c")
-    val city: String get() = prefs.getString("place", "").orEmpty()
+    val mode: String get() = if (Demo.items != null) MODE_CITY else prefs.getString("mode", MODE_OFF)!!
+    val hasData: Boolean get() = Demo.items != null || (mode != MODE_OFF && prefs.contains("temp_c"))
+    val city: String get() = if (Demo.items != null) "Helsinki" else prefs.getString("place", "").orEmpty()
     /** In the chosen unit; stored in °C, so switching units never needs a new reading. */
     val temperature: Int get() {
-        val c = prefs.getFloat("temp_c", 0f)
+        val c = if (Demo.items != null) 18f else prefs.getFloat("temp_c", 0f)
         return Math.round(if (fahrenheit) c * 9f / 5f + 32f else c)
     }
-    val code: Int get() = prefs.getInt("code", -1)
-    val isDay: Boolean get() = prefs.getBoolean("day", true)
+    val code: Int get() = if (Demo.items != null) 2 else prefs.getInt("code", -1)
+    val isDay: Boolean get() = Demo.items != null || prefs.getBoolean("day", true)
     /**
      * °F or °C: the choice in Home settings, else Android's own temperature unit (Regional
      * preferences, Android 14+), else the region's usual unit.
      */
-    val fahrenheit: Boolean get() = when (prefs.getString("unit", null)) {
+    val fahrenheit: Boolean get() = if (Demo.items != null) false else when (prefs.getString("unit", null)) {
         "f" -> true
         "c" -> false
         else -> when (Locale.getDefault().getUnicodeLocaleType("mu")) {
@@ -151,7 +152,7 @@ object Weather {
      */
     fun icon(): Int? {
         val c = code
-        val t = Math.round(prefs.getFloat("temp_c", 0f))
+        val t = if (Demo.items != null) 18 else Math.round(prefs.getFloat("temp_c", 0f))
         return when {
             c < 0 -> null
             c <= 1 && t >= 35 -> R.drawable.n9_weather_hot

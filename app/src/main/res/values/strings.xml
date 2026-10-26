@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name">Harmattan Home</string>
     <string name="settings_name">Home settings</string>
+    <string name="home_editor">Home editor</string>
     <string name="qtn_home_launcher_folder_default_name">Folder</string>
     <string name="qtn_home_launcher_new_folder">New folder</string>
 

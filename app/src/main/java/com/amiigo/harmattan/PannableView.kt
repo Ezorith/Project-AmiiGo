@@ -131,6 +131,14 @@ open class PannableView(ctx: Context) : ViewGroup(ctx) {
         return pos - old
     }
 
+    /** [nudge] while the content is growing this frame: [contentH] is its new height. */
+    fun nudgeAfterGrow(dy: Float, contentH: Int): Float {
+        val old = pos
+        pos = (pos + dy).coerceIn(0f, max(0f, (contentH + bottomInset - height).toFloat()))
+        if (pos != old) { lastMoveTime = System.currentTimeMillis(); apply() }
+        return pos - old
+    }
+
     fun stop() {
         running = false
         vel = 0f

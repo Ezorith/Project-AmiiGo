@@ -69,7 +69,7 @@ class RecentsPreview(ctx: Context) : PanelPreview(ctx) {
     }
 }
 
-/** Today: the status bar (N9 or Android's), the date and weather, and the first notifications. */
+/** Today: the date and weather, and the first notifications. */
 class TodayPreview(ctx: Context) : PanelPreview(ctx) {
     var scale = Apps.todayScale; set(v) { field = v; invalidate() }
     var statusScale = Apps.statusBarScale; set(v) { field = v; invalidate() }
@@ -94,53 +94,10 @@ class TodayPreview(ctx: Context) : PanelPreview(ctx) {
         wall?.let {
             val screenH = (width * resources.displayMetrics.heightPixels / resources.displayMetrics.widthPixels.toFloat()).toInt()
             Wallpaper.drawCover(c, it, android.graphics.Rect(0, 0, width, screenH), bmp)
-            Wallpaper.drawShade(c, width, screenH, (36f + 110f * scale) * u0, dim, shade)
+            Wallpaper.drawShade(c, width, screenH, (8f + 110f * scale) * u0, dim, shade)
         }
-        // Status bar.
-        var top: Float
-        val clock = android.text.format.DateFormat.getTimeFormat(context).format(Date()).replace(Regex("\\s?[AaPp][Mm]$"), "")
-        if (n9StatusBar) {
-            val k = u0 * statusScale
-            val h = 36f * k
-            val iconH = 15f * k
-            val cy = h / 2f
-            var x = 8f * k
-            fun icon(res: Int, cropL: Int = 0) {
-                val b = N9.bitmap(context, res)
-                val w = iconH * (b.width - cropL) / b.height
-                c.drawBitmap(b, android.graphics.Rect(cropL, 0, b.width, b.height), RectF(x, cy - iconH / 2f, x + w, cy + iconH / 2f), bmp)
-                x += w + 6f * k
-            }
-            icon(R.drawable.n9_status_battery8)
-            icon(R.drawable.n9_status_network5, 4 * N9.HD)
-            if (showOperator) {
-                val op = runCatching { context.getSystemService(android.telephony.TelephonyManager::class.java)?.networkOperatorName }.getOrNull().orEmpty().ifEmpty { "Operator" }
-                p.textSize = N9.FONT_XSMALL * k
-                text(c, op, x, cy - (p.ascent() + p.descent()) / 2f, N9.FONT_XSMALL * k, N9.regular, Color.WHITE)
-                x += p.measureText(op) + 8f * k
-            }
-            icon(R.drawable.n9_status_wlan)
-            p.textSize = N9.FONT_XSMALL * k; p.typeface = N9.regular
-            text(c, clock, width - 8f * k - p.measureText(clock), cy - (p.ascent() + p.descent()) / 2f, N9.FONT_XSMALL * k, N9.regular, Color.WHITE)
-            top = h
-        } else {
-            // Android's own bar, as One UI draws it: the clock on the left, signal, Wi-Fi and battery on the right.
-            val h = 40f * u0
-            val cy = h / 2f
-            p.textSize = 18f * u0
-            text(c, clock, 18f * u0, cy - (p.ascent() + p.descent()) / 2f, 18f * u0, N9.bold, Color.WHITE)
-            val iconH = 13f * u0
-            var x = width - 18f * u0
-            for ((res, crop) in listOf(R.drawable.n9_status_battery8 to 0, R.drawable.n9_status_wlan to 0, R.drawable.n9_status_network5 to 4 * N9.HD)) {
-                val b = N9.bitmap(context, res)
-                val w = iconH * (b.width - crop) / b.height
-                x -= w
-                c.drawBitmap(b, android.graphics.Rect(crop, 0, b.width, b.height), RectF(x, cy - iconH / 2f, x + w, cy + iconH / 2f), bmp)
-                x -= 6f * u0
-            }
-            top = h
-        }
-        // Today, at its size.
+        // Today, at its size (no status bar: the preview is just the view).
+        var top = 8f * u0
         val u = u0 * scale
         val t = N9.textScale
         top += 2f * u

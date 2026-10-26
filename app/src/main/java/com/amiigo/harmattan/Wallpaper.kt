@@ -33,6 +33,11 @@ object Wallpaper {
     /** Blur behind Applications and Recents, 0..1 (of [MAX_BLUR]). */
     fun blur(ctx: Context) = prefs(ctx).getFloat("wallpaper_blur", 0.6f)
     fun setBlur(ctx: Context, f: Float) = prefs(ctx).edit().putFloat("wallpaper_blur", f).apply()
+    /** The wallpaper drifts a little as you swipe between views. */
+    fun parallax(ctx: Context) = prefs(ctx).getBoolean("wallpaper_parallax", true)
+    fun setParallax(ctx: Context, on: Boolean) = prefs(ctx).edit().putBoolean("wallpaper_parallax", on).apply()
+    /** How far it drifts each way, as a share of the screen's width. */
+    const val PARALLAX = 0.06f
     private fun prefs(ctx: Context) = ctx.getSharedPreferences("home", Context.MODE_PRIVATE)
     const val MAX_BLUR = 90f // device px
 
@@ -91,11 +96,26 @@ class WallpaperView(ctx: Context) : View(ctx) {
     /** Where Today's date row ends (the black gradient's length), device px. */
     var topH = 0f
 
+    /**
+     * For Today's own copy (inside the scaled panel, below the status bar): how far above this view
+     * the screen starts, and the screen's height, in this view's px. Then it matches the full-screen one.
+     */
+    var screenTop = 0f
+    var screenH = 0f
+
+    /** Parallax drift, -1..1 (0 at Today). */
+    var drift = 0f
+        set(v) { if (abs(v - field) > 0.0005f) { field = v; if (parallax) invalidate() } }
+    private var parallax = true
+    /** The full-screen one's parallax width, so Today's copy can draw at the same size. */
+    var parallaxWidth = 0
+
     /** Pick up a new or removed picture and the latest settings. */
     fun refresh() {
         val s = if (Wallpaper.exists(context)) Wallpaper.stamp(context) else 0L
         if (s != stamp) { stamp = s; bmp = if (s == 0L) null else Wallpaper.load(context) }
         visibility = if (bmp != null && active) VISIBLE else GONE
+        parallax = Wallpaper.parallax(context)
         applyBlur(); invalidate()
     }
 
@@ -108,13 +128,23 @@ class WallpaperView(ctx: Context) : View(ctx) {
 
     override fun onDraw(c: Canvas) {
         val b = bmp ?: return
-        Wallpaper.drawCover(c, b, Rect(0, 0, width, height), p)
+        // With parallax the picture is drawn a little wider than the screen and slides with the views.
+        val extra = if (!parallax) 0 else if (parallaxWidth > 0) parallaxWidth else (width * Wallpaper.PARALLAX).toInt()
+        val dx = (-drift * extra).toInt()
+        val h = if (screenH > 0f) screenH.toInt() else height
+        c.save(); c.translate(0f, -screenTop)
+        Wallpaper.drawCover(c, b, Rect(-extra + dx, 0, width + extra + dx, h), p)
         // Today: dark at the top for the date and weather, then the chosen darkness; elsewhere the darkness only.
         val top = topH * (1f - blurAmount)
-        Wallpaper.drawShade(c, width, height, max(1f, top), Wallpaper.dim(context), shade)
+        Wallpaper.drawShade(c, width, h, max(1f, top), Wallpaper.dim(context), shade)
+        c.restore()
     }
 
     companion object {
+        /** Parallax drift for ring [offset]: 0 at Today ([page] of [n]), smooth all the way round. */
+        fun drift(offset: Float, page: Int, n: Int): Float =
+            kotlin.math.sin(2.0 * Math.PI * (offset - page) / n).toFloat() / kotlin.math.sin(2.0 * Math.PI / n).toFloat()
+
         /** How far the ring [offset] is from Today ([page] of [n]), 0..1. */
         fun distance(offset: Float, page: Int, n: Int): Float {
             var d = abs(offset - page) % n

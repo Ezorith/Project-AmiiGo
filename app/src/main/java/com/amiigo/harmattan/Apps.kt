@@ -105,8 +105,20 @@ object Apps {
         "youtube" to "YouTube", "skype" to "Skype", "firefox" to "Firefox",
     )
 
+    /**
+     * A stand-in app with the N9's own icon and name for [role] ([res] and [name] for icons the
+     * roles don't cover), for the demo grid.
+     */
+    fun demoEntry(role: String, res: Int? = null, name: String? = null): AppEntry? {
+        val r = res ?: (if (role == "calendar") calendarIcon() else ROLE_ICON[role]) ?: return null
+        val size = all.firstOrNull()?.icon?.width ?: N9.ipx(80)
+        val art = Bitmap.createScaledBitmap(N9.bitmap(app, r), size, size, true)
+        return AppEntry(android.content.ComponentName(Demo.PKG, role), android.os.Process.myUserHandle(),
+            name ?: ROLE_NAME[role] ?: role, art, role, false, averageColor(art))
+    }
+
     /** /etc/xdg/meegotouchhome-nokia/launcherbuttons.data, by role. */
-    private val DEFAULT_ORDER = listOf(
+    val DEFAULT_ORDER = listOf(
         "telephony", "contacts", "search", "browser", "conversation", "email", "calendar", "clock",
         "camera", "gallery", "music", "videos", "maps", "store", "facebook", "twitter", "settings",
         "calculator", "documents", "rss", "notes", "youtube", "skype",
@@ -531,6 +543,7 @@ object Apps {
 
     /** Start [e]. [bounds] is the icon/tile on screen, [opts] the window animation (see LaunchAnimator). */
     fun launch(e: AppEntry, bounds: Rect?, opts: android.os.Bundle?) {
+        if (e.pkg == Demo.PKG) return // a demo grid's stand-in: nothing to open
         runCatching { launcherApps.startMainActivity(e.component, e.user, bounds, opts) }
         noteOpened(e)
     }
@@ -567,6 +580,7 @@ object Apps {
 
     /** Recently opened apps that are still installed, newest window first. */
     fun recentApps(): List<AppEntry> {
+        Demo.recents()?.let { return it }
         systemTasks?.let { tasks ->
             // Shizuku mode: exactly the system Recents list, in its order.
             val byKey = installed.associateBy { it.key }

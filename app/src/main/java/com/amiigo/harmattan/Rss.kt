@@ -410,11 +410,10 @@ object Rss {
     }
 
     private val MONO_COLORS = intArrayOf(
-        0xFF1A9BFF.toInt(), 0xFF2E7D32.toInt(), 0xFFC62828.toInt(), 0xFF6A1B9A.toInt(), 0xFFEF6C00.toInt(),
-        0xFF00838F.toInt(), 0xFFAD1457.toInt(), 0xFF4E342E.toInt(), 0xFF283593.toInt(), 0xFF558B2F.toInt(),
+        0xFF757575.toInt(), // system grey
     )
 
-    /** A stand-in picture: the name's first letter on a colour picked from the name. */
+    /** A stand-in picture: the name's first letter on system grey. */
     fun monogram(name: String): Bitmap {
         val size = N9.ipx(64)
         val b = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)

@@ -380,7 +380,7 @@ class LauncherGrid(ctx: Context, private val panel: LauncherPanel) : ViewGroup(c
     }
 
     fun sync() {
-        items.clear(); items += Apps.items
+        items.clear(); items += Demo.apps(Apps.items)
         val openId = openFolder?.id
         openFolder = items.filterIsInstance<LItem.Dir>().firstOrNull { it.f.id == openId }?.f
         rebuildButtons()
@@ -392,7 +392,7 @@ class LauncherGrid(ctx: Context, private val panel: LauncherPanel) : ViewGroup(c
         mainButtons.clear()
         for (i in items) { mainButtons += buttonFor(i); wanted += i.key }
         folderButtons.clear()
-        openFolder?.let { f -> for (a in f.apps) { val li = LItem.App(a); folderButtons += buttonFor(li); wanted += li.key } }
+        openFolder?.let { f -> for (a in Demo.folderApps(f.apps)) { val li = LItem.App(a); folderButtons += buttonFor(li); wanted += li.key } }
         val dead = buttons.keys.filter { it !in wanted && buttons[it] !== dragged }
         for (k in dead) { removeView(buttons[k]); buttons.remove(k) }
         if (editMode) for (b in mainButtons + folderButtons) if (b.closable && b.badge == 0f) b.animateBadge(true) { invalidate() }
@@ -400,6 +400,7 @@ class LauncherGrid(ctx: Context, private val panel: LauncherPanel) : ViewGroup(c
     }
 
     private fun commit() {
+        if (Demo.items != null) return // the demo grid is a filtered view: never save it
         Apps.setItems(items)
         mainButtons.forEach { it.invalidate() }
     }
@@ -430,7 +431,7 @@ class LauncherGrid(ctx: Context, private val panel: LauncherPanel) : ViewGroup(c
 
     private val openIdx: Int get() = openFolder?.let { f -> items.indexOfFirst { it is LItem.Dir && it.f === f } } ?: -1
 
-    private fun folderRows() = max(1, ceil((openFolder?.apps?.size ?: 0) / cols.toFloat()).toInt())
+    private fun folderRows() = max(1, ceil((openFolder?.apps?.let { Demo.folderApps(it).size } ?: 0) / cols.toFloat()).toInt())
 
     /** Full (unanimated) folder container box, in grid coordinates. */
     private fun boxRect(): RectF {
@@ -474,7 +475,9 @@ class LauncherGrid(ctx: Context, private val panel: LauncherPanel) : ViewGroup(c
         var h = N9.px(PAD_T + rows * BH + (rows - 1) * VS + PAD_B)
         if (openIdx >= 0) {
             h += shift() * folderP
-            h = max(h, boxRect().bottom * 1f + N9.px(F_BELOW))
+            // Grows and shrinks with the box, so the scroll range never jumps.
+            val box = boxRect()
+            h = max(h, box.top + (box.bottom - box.top + N9.px(F_BELOW)) * folderP)
         }
         nameEdit.measure(MeasureSpec.makeMeasureSpec(nameRect().width().toInt().coerceAtLeast(1), MeasureSpec.EXACTLY),
             MeasureSpec.makeMeasureSpec(nameRect().height().toInt().coerceAtLeast(1), MeasureSpec.EXACTLY))
@@ -550,12 +553,11 @@ class LauncherGrid(ctx: Context, private val panel: LauncherPanel) : ViewGroup(c
         openFolder = f
         rebuildButtons()
         for (b in folderButtons) { b.alpha = 0f; b.tag = "new" }
-        animateFolder(1f) {
-            // Keep the opened folder on screen (folder-content-minimum-bottom-margin 14.7mm).
-            val bottom = boxRect().bottom - panel.pannable.pos
-            val visible = panel.pannable.height - panel.pannable.bottomInset - N9.px(if (editMode) 75f else 147f)
-            if (bottom > visible) smoothNudge(bottom - visible)
-        }
+        // Keep the opened folder on screen (folder-content-minimum-bottom-margin 14.7mm), scrolling
+        // along with the box as it grows rather than after it.
+        val bottom = boxRect().bottom - panel.pannable.pos
+        val visible = panel.pannable.height - panel.pannable.bottomInset - N9.px(if (editMode) 75f else 147f)
+        animateFolder(1f, scroll = max(0f, bottom - visible)) {}
     }
 
     fun closeFolder(animated: Boolean = true) {
@@ -569,7 +571,7 @@ class LauncherGrid(ctx: Context, private val panel: LauncherPanel) : ViewGroup(c
      * SwipeLauncherFolderContainerStyle: size-change-animation 250ms outexpo; contents fade in with
      * outexpo (open-animation-start-opacity 0) and out with outsine (close-animation-target-opacity 0).
      */
-    private fun animateFolder(to: Float, end: () -> Unit) {
+    private fun animateFolder(to: Float, scroll: Float = 0f, end: () -> Unit) {
         folderAnim?.cancel()
         val from = folderP
         val opening = to > from
@@ -577,11 +579,18 @@ class LauncherGrid(ctx: Context, private val panel: LauncherPanel) : ViewGroup(c
             // Main buttons return to normal opacity as the folder closes.
             for (b in mainButtons) b.animateOpacity(if (editMode) 0.5f else 1f)
         }
+        var scrolled = 0f
         folderAnim = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = 250
             addUpdateListener {
                 val t = it.animatedFraction
                 folderP = from + (to - from) * Ease.outExpo.getInterpolation(t)
+                if (scroll > 0f) {
+                    val want = scroll * Ease.outExpo.getInterpolation(t)
+                    following = true
+                    measure(MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED))
+                    scrolled += panel.pannable.nudgeAfterGrow(want - scrolled, measuredHeight)
+                }
                 val o = if (opening) Ease.outExpo.getInterpolation(t) else 1f - Ease.outSine.getInterpolation(t)
                 for (b in folderButtons) if (b !== dragged) b.alpha = o * (if (editMode) 0.5f else 1f)
                 following = true
@@ -591,8 +600,10 @@ class LauncherGrid(ctx: Context, private val panel: LauncherPanel) : ViewGroup(c
             addListener(object : android.animation.AnimatorListenerAdapter() {
                 override fun onAnimationEnd(a: android.animation.Animator) { following = false; end() }
             })
-            start()
         }
+        // Start once the new folder's buttons have been laid out and drawn, so a slow first frame
+        // doesn't eat the animation (it used to pop open at full size).
+        folderAnim?.let { a -> postOnAnimation { if (folderAnim === a) postOnAnimation { if (folderAnim === a) a.start() } } }
     }
 
     private fun smoothNudge(dy: Float) {

@@ -72,11 +72,14 @@ class BackToTopButton(ctx: Context, private val label: String = "Back to top", p
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         shade.shader = android.graphics.LinearGradient(0f, 0f, 0f, h.toFloat(),
-            intArrayOf(0x00000000, 0xB3000000.toInt(), 0xE6000000.toInt()), floatArrayOf(0f, 0.55f, 1f), android.graphics.Shader.TileMode.CLAMP)
+            intArrayOf(0x00000000, 0xD9000000.toInt(), 0xF5000000.toInt(), 0xFF000000.toInt()), floatArrayOf(0f, 0.4f, 0.75f, 1f), android.graphics.Shader.TileMode.CLAMP)
     }
 
     /** Whether ([x], [y]) in the parent's coordinates is on the pill. */
     fun hits(x: Float, y: Float) = shown && RectF(pill).apply { offset(left.toFloat(), top.toFloat()); inset(-N9.px(12f), -N9.px(8f)) }.contains(x, y)
+
+    /** Whether ([x], [y]) in the parent's coordinates is on the strip the pill sits on (which takes the touch). */
+    fun inStrip(y: Float) = shown && y >= top + pill.top - N9.px(8f)
 
     fun show(on: Boolean) {
         if (on == shown) return
@@ -105,7 +108,8 @@ class BackToTopButton(ctx: Context, private val label: String = "Back to top", p
         if (!shown) return false
         val on = RectF(pill).apply { inset(-N9.px(12f), -N9.px(8f)) }.contains(e.x, e.y)
         when (e.actionMasked) {
-            MotionEvent.ACTION_DOWN -> { if (!on) return false; down = true }
+            // The whole strip around the pill takes the touch, so nothing underneath opens by mistake.
+            MotionEvent.ACTION_DOWN -> { if (e.y < pill.top - N9.px(8f)) return false; down = on }
             MotionEvent.ACTION_MOVE -> down = on
             MotionEvent.ACTION_UP -> { if (down) { performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY); onTap() }; down = false }
             MotionEvent.ACTION_CANCEL -> down = false

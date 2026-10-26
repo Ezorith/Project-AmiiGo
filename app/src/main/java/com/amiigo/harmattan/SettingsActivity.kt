@@ -120,7 +120,8 @@ class SettingsActivity : Activity() {
         }
     }
 
-    private fun group(s: String) {
+    /** A separator; [labelled] shows its name (only "System" does). */
+    private fun group(s: String, labelled: Boolean = false) {
         lastRow = null
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -129,6 +130,7 @@ class SettingsActivity : Activity() {
             setPadding(0, N9.ipx(10), 0, 0)
         }
         row.addView(divider(), LinearLayout.LayoutParams(0, N9.ipx(2), 1f))
+        if (labelled) row.addView(text(s, 18f, 0xFF707070.toInt(), bold = true), LinearLayout.LayoutParams(-2, -2).apply { marginStart = N9.ipx(12) })
         list.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = N9.ipx(6) })
     }
 
@@ -322,18 +324,20 @@ class SettingsActivity : Activity() {
                 appearance()
                 group("Applications")
                 applications()
-                switchItem("Scroll bars", null, Apps.showScrollbars) { Apps.setShowScrollbars(it) }
-                group("Gesture bar")
-                switchItem("Gesture pill", null, Apps.showGesturePill) { Apps.setShowGesturePill(it) }
-                if (Apps.showGesturePill) switchItem("Black bar behind the pill", null, Apps.blackNavBar) { Apps.setBlackNavBar(it) }
             }
             "switcher" -> openApps()
             "events" -> {
                 today()
-                group("Status bar")
-                statusBar()
                 group("Feed")
                 feed()
+                // Settings for all three views.
+                group("System", labelled = true)
+                switchItem("System notifications", null, EventStore.showOngoing) { EventStore.setShowOngoing(it) }
+                note("Show undismissable system notifications in Today, like charging, USB options and downloads.")
+                statusBar()
+                switchItem("Scroll bars", null, Apps.showScrollbars) { Apps.setShowScrollbars(it) }
+                switchItem("Gesture pill", null, Apps.showGesturePill) { Apps.setShowGesturePill(it) }
+                if (Apps.showGesturePill) switchItem("Black bar behind the pill", null, Apps.blackNavBar) { Apps.setBlackNavBar(it) }
             }
         }
     }
@@ -377,7 +381,6 @@ class SettingsActivity : Activity() {
         if (sheet != null) {
             list.setPadding(indent, 0, indent, N9.ipx(160))
             pinned?.removeAllViews()
-            sheetHeader(panelTitle(sheet))
             // The panel's preview, pinned under the header.
             val pv: View = when (sheet) {
                 "launcher" -> HomePreview(this).apply {
@@ -387,7 +390,7 @@ class SettingsActivity : Activity() {
                 "switcher" -> RecentsPreview(this).also { recentsPreview = it }
                 else -> TodayPreview(this).also { todayPreview = it }
             }
-            pinned?.addView(pv, LinearLayout.LayoutParams(-1, -2).apply { leftMargin = -indent; rightMargin = -indent })
+            pinned?.addView(pv, LinearLayout.LayoutParams(-1, -2).apply { leftMargin = -indent; rightMargin = -indent; bottomMargin = N9.ipx(28) })
             panelContent(sheet)
             list.addView(View(this), LinearLayout.LayoutParams(1, N9.ipx(40)))
             scroll.post { scroll.scrollTo(0, y) }
@@ -456,6 +459,10 @@ class SettingsActivity : Activity() {
     }
 
     private fun openApps() {
+        if (!Apps.hasUsageAccess() && !(Apps.matchRecents && SystemRecents.granted()))
+            item("Allow usage access", "So Recents follows apps you open from elsewhere") {
+                startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+            }
         label("Large tiles up to")
         val counts = listOf(4, 6, 8, 10, 12)
         list.addView(Segments(this, counts.map { "$it" }, counts.indexOf(Apps.switcherLargeMax).let { if (it < 0) 3 else it }) { i ->
@@ -487,6 +494,10 @@ class SettingsActivity : Activity() {
     }
 
     private fun today() {
+        // Without notification access Today can't show notifications or the feed: say so first.
+        if (!notificationsAllowed()) item("Allow notification access", "Needed for notifications and the feed") {
+            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+        }
         label("Size")
         sizeSlider("scale_today", Apps.todayScale, StepSlider.Glyph.TEXT) { todayPreview?.scale = it }
         group("Weather")
@@ -518,11 +529,9 @@ class SettingsActivity : Activity() {
             list.addView(StepSlider(this, blurs.size, closeTo(blurs, Wallpaper.blur(this)).let { if (it < 0) 2 else it }, StepSlider.Glyph.ICON,
                 onMove = {}, onPick = { i -> Wallpaper.setBlur(this, blurs[i]) }))
             note("How blurred the wallpaper is behind Applications and Recents. Behind Today it's always sharp.")
+            switchItem("Parallax", null, Wallpaper.parallax(this)) { Wallpaper.setParallax(this, it) }
             item("Remove wallpaper", null, drill = false) { Wallpaper.remove(this); build() }
         }
-        group("Notifications")
-        switchItem("Ongoing and system notifications", if (EventStore.showOngoing) "Charging, USB options, private tabs, downloads…"
-            else "Only notifications you can clear", EventStore.showOngoing) { EventStore.setShowOngoing(it) }
     }
 
     private fun feed() {

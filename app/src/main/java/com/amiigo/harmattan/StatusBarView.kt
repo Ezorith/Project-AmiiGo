@@ -35,6 +35,7 @@ class StatusBarView(ctx: Context) : View(ctx) {
     private val clockPaint = N9.textPaint(N9.regular, N9.FONT_XSMALL, N9.COLOR_INVERTED_FOREGROUND, scaled = false)
         .apply { textSize *= Apps.statusBarScale.coerceIn(0.7f, 1.6f) }
     private val iconPaint = Apps.iconPaint()
+    private val bgPaint = android.graphics.Paint()
 
     private var level = 100
     private var charging = false
@@ -260,7 +261,10 @@ class StatusBarView(ctx: Context) : View(ctx) {
 
     @SuppressLint("DrawAllocation")
     override fun onDraw(canvas: Canvas) {
-        canvas.drawColor(N9.COLOR_INVERTED_BACKGROUND)
+        // Its own area only: drawColor would fill whatever the parent lets it draw on, and home
+        // doesn't clip its children (the Home editor's side panels), so it blacked out the screen.
+        bgPaint.color = N9.COLOR_INVERTED_BACKGROUND
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
         // Centre the row on the camera hole when there is one, so icons line up with it.
         val cut = hole?.takeIf { it.height() > 0 && it.top < height }
         val h = px(N9.STATUSBAR)
@@ -303,6 +307,8 @@ class StatusBarView(ctx: Context) : View(ctx) {
                 // a 4-bar N9 icon whose lit bars are exactly the system's level: network(L+1) minus bar 1.
                 val res = network[signal + 1]
                 x = drawCrop(bmp(res), ink(network[5], fromX = 4 * N9.HD), x) + px(GAP)
+                // Demo mode (screenshots): a stand-in network name rather than the phone's.
+                val operator = if (Demo.items != null) "Harmattan" else operator
                 if (operator.isNotEmpty() && Apps.showOperator) {
                     // Shortened if it would run into the hole (leaving room for the Wi-Fi icon).
                     val wifiW = if (wifi) iconH * ink(R.drawable.n9_status_wlan).width() / ink(R.drawable.n9_status_wlan).height() + px(GAP) else 0f
