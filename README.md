@@ -3,22 +3,8 @@
 **Harmattan Home** — the Nokia N9's MeeGo 1.2 Harmattan home screen, rebuilt for Android from the N9's own firmware.
 
 > **BETA**
-<<<<<<< Updated upstream
-=======
 
-![Recents, Today and Applications](docs/mockups/views.png)
->>>>>>> Stashed changes
-
-<p align="center">
-  <img src="docs/mockups/today_held.png" width="24%" alt="Today held: dimmed, with ✕ on notifications">
-  <img src="docs/mockups/folder.png" width="24%" alt="An open folder">
-  <img src="docs/mockups/editor.png" width="24%" alt="The Home editor">
-  <img src="docs/mockups/customize.png" width="24%" alt="Customize Today, with its live preview">
-</p>
-
-*As it looks out of the box, with demo content.*
-
-**Clips:** [swiping between views](docs/mockups/clips/swipe.mp4) · [folders](docs/mockups/clips/folder.mp4) · [Home editor](docs/mockups/clips/editor.mp4)
+<img width="100%" alt="views" src="https://github.com/user-attachments/assets/50fafef3-c533-4f6e-b96e-04970ee49eba" />
 
 ## Why it's the most authentic Harmattan launcher
 
@@ -30,10 +16,8 @@ Most "N9-style" launchers are redrawn from screenshots. Harmattan Home isn't. It
 - **Colors, fonts and type sizes** come from the Blanco theme's constants. The text is Nokia Pure, from the firmware.
 - **The motion is the N9's.** The `overshotbezier` curve was read out of `libmeegotouchcore` as a 100-point table, and the kinetic scrolling physics (`MPhysics2DPanning`: friction, edge spring, bounce) were decoded from the ARM machine code and re-implemented exactly.
 - **The weather widget** is laid out from the N9's AccuWeather home widget, decompressed from inside its extension library, with the N9's own 20 weather icons.
-<<<<<<< Updated upstream
-=======
 
->>>>>>> Stashed changes
+=======
 
 ### Upscaled for today's screens
 
