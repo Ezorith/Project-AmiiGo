@@ -2,9 +2,7 @@
 
 **Harmattan Home** — the Nokia N9's MeeGo 1.2 Harmattan home screen, rebuilt for Android from the N9's own firmware.
 
-> **Beta.** Harmattan Home is usable day to day, but expect rough edges. Bug reports are very welcome.
-
-Swipe. That's how the N9 worked, and that's how Harmattan Home works: three views on an endless ring — **Applications → Recents → Today → Applications…** — dragged one-to-one under your finger, with the N9's own fonts, artwork, physics and timing.
+> **BETA**
 
 ---
 
@@ -15,11 +13,9 @@ Most "N9-style" launchers are redrawn from screenshots. Harmattan Home isn't. It
 ### Taken from the compiled firmware, not from screenshots
 
 - **Layouts, sizes and timings** come straight from the N9 home screen's stylesheets (`meegotouchhome.css`): tile sizes, spacing, animation durations and easing curves, down to the 20 ms stagger when you close all apps.
-- **Colours, fonts and type sizes** come from the Blanco theme's constants. The text is Nokia Pure, from the firmware.
+- **Colors, fonts and type sizes** come from the Blanco theme's constants. The text is Nokia Pure, from the firmware.
 - **The motion is the N9's.** The `overshotbezier` curve was read out of `libmeegotouchcore` as a 100-point table, and the kinetic scrolling physics (`MPhysics2DPanning`: friction, edge spring, bounce) were decoded from the ARM machine code and re-implemented exactly.
-- **The words are the N9's:** "Clear", "Refresh", "New folder", "Close all", "Nothing open yet" come from the firmware's own translation files. Text the N9 never showed (like a "no notifications" message) isn't shown here either.
 - **The weather widget** is laid out from the N9's AccuWeather home widget, decompressed from inside its extension library, with the N9's own 20 weather icons.
-- **The settings pages** follow the N9 Settings app: its group headers, drill-down arrows, sliders and switches, all drawn from the original theme art.
 
 ### Upscaled for today's screens
 
@@ -39,9 +35,8 @@ Android doesn't let a home app see or control the system's recent apps. With [Sh
 
 - **Recents matches Android's recent apps exactly,** in the same order. Closing an app in one closes it in the other.
 - **Live previews:** each Recents tile shows the app as you left it, using Android's own task snapshots, the closest thing to the N9's live windows. Leaving an app, its window shrinks back into its tile.
-- **Close all,** as on the N9.
 
-Without Shizuku, everything still works: Recents follows the apps you open, and tiles show app-coloured window cards.
+Without Shizuku, everything still works: Recents follows the apps you open, and tiles show app-colored window cards.
 
 ---
 
