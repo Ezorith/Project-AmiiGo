@@ -1,16 +1,15 @@
 # Project AmiiGo: Welcome home, friend.
 
-**Harmattan Home** — the Nokia N9's MeeGo 1.2 Harmattan home screen, rebuilt for Android from the N9's own firmware.
+**Harmattan Home** — Nokia N9's MeeGo 1.2 Harmattan home screen, rebuilt for Android.
 
-> **BETA:** Usable in day-to-day, bugs are expected.
+>[!NOTE]
+>**BETA:** Usable in day-to-day, bugs are expected.
 
 <img width="100%" alt="views" src="https://github.com/user-attachments/assets/50fafef3-c533-4f6e-b96e-04970ee49eba" />
 
 ## Why it's the most authentic Harmattan launcher
 
 Most "N9-style" launchers are redrawn from screenshots. Harmattan Home isn't. It was built by unpacking the N9's PR1.3 firmware (`DFL61_HARMATTAN_40.2012.21-3`) and taking the real thing apart.
-
-### Taken from the compiled firmware, not from screenshots
 
 - **Layouts, sizes and timings** come straight from the N9 home screen's stylesheets (`meegotouchhome.css`): tile sizes, spacing, animation durations and easing curves, down to the 20 ms stagger when you close all apps.
 - **Colors, fonts and type sizes** come from the Blanco theme's constants. The text is Nokia Pure, from the firmware.
@@ -37,8 +36,6 @@ Android doesn't let a home app see or control the system's recent apps. With [Sh
 - **Live previews:** each Recents tile shows the app as you left it, using Android's own task snapshots, the closest thing to the N9's live windows. Leaving an app, its window shrinks back into its tile.
 
 Without Shizuku, everything still works: Recents follows the apps you open, and tiles show app-colored window cards.
-
----
 
 ## Features
 
@@ -70,21 +67,6 @@ Without Shizuku, everything still works: Recents follows the apps you open, and 
 
 ### Home editor
 Hold an empty part of **Today** and tap **Home editor**. Home zooms out to show the three views side by side; pick one and tap **Customize** for its settings, each with a live preview. Settings that affect every view (system notifications, status bar, scroll bars, gesture pill) are under **System** in Customize Today.
-
----
-
-## What's new in this beta
-
-- **Home editor:** the hold menu in Today is now called Home editor. Customize sheets drop their titles to give the live preview more room, and the shared settings sit together under **System** in Customize Today.
-- **Today edit mode:** holding Today dims it like the other views and puts ✕ on every notification you can dismiss.
-- **Message photos:** text and chat notifications show the contact's photo with the app's badge.
-- **Parallax wallpaper:** the wallpaper drifts slightly as you swipe between views (on by default; switch it off in Customize Today).
-- **Smoother folders:** a folder near the bottom of Applications now grows and scrolls into view in one motion, and closes the same way.
-- **Back to top** sits on a darker band, and touches around it no longer open the post underneath or bring up the Home editor.
-- **Feed letter tiles** for sources without a picture are now a neutral grey.
-- **Fixes:** the wallpaper no longer jumps when you leave the Home editor, and the screen no longer flashes black as the Home editor opens.
-
----
 
 ## Requirements
 
@@ -123,8 +105,6 @@ adb shell am start -n com.amiigo.harmattan/.HomeActivity --ez demo true
 
 (`--ez demo false` turns it off.)
 
----
-
 ## How it was made
 
 The N9's firmware image is a FIASCO container. Its `rootfs` is a chunked LZO1X stream (20-byte chunk headers `10 b4 c3 b8`), whose payload is a sparse map (`a1 a9 ae ad`) followed by a 4 GiB ext4 filesystem. Once unpacked:
@@ -150,8 +130,7 @@ MeeGo stylesheets measure in millimetres at 10 px per mm on the 480 px-wide N9. 
 - **The swipe from the bottom** belongs to Android. Harmattan Home takes over the moment it ends, so leaving an app shrinks its window into Recents, as on the N9.
 - **The feed** can't sign in to Facebook or X the way the N9's services did. It collects those apps' notifications instead, plus public feeds.
 - **Wallpaper and per-panel sizes** are additions; leave them at their defaults for the stock N9 look.
-
----
+- **Why?** Curiosity and nostalgia kickstarted this project in an attempt to re-experience the UI that never had a chance, and preserve that experience as a home launcher for Android.
 
 ## Notices
 
