@@ -1,8 +1,8 @@
-# Project AmiiGo
+# Project AmiiGo: Welcome home, friend.
 
 **Harmattan Home** — the Nokia N9's MeeGo 1.2 Harmattan home screen, rebuilt for Android from the N9's own firmware.
 
-> **BETA**
+> **BETA:** Usable in day-to-day, bugs are expected.
 
 <img width="100%" alt="views" src="https://github.com/user-attachments/assets/50fafef3-c533-4f6e-b96e-04970ee49eba" />
 
@@ -16,8 +16,6 @@ Most "N9-style" launchers are redrawn from screenshots. Harmattan Home isn't. It
 - **Colors, fonts and type sizes** come from the Blanco theme's constants. The text is Nokia Pure, from the firmware.
 - **The motion is the N9's.** The `overshotbezier` curve was read out of `libmeegotouchcore` as a 100-point table, and the kinetic scrolling physics (`MPhysics2DPanning`: friction, edge spring, bounce) were decoded from the ARM machine code and re-implemented exactly.
 - **The weather widget** is laid out from the N9's AccuWeather home widget, decompressed from inside its extension library, with the N9's own 20 weather icons.
-
-=======
 
 ### Upscaled for today's screens
 
@@ -59,7 +57,7 @@ Without Shizuku, everything still works: Recents follows the apps you open, and 
 ### Today
 - The date with an N9 weather widget. Weather comes from [Open-Meteo](https://open-meteo.com/) (free, no account), for your location or a city you choose, in °C or °F.
 - **Notifications** with each app's own icon. Messages show the sender's photo and music its album art, each with the app as a badge. Tap to open and clear; system ones (charging, USB…) can be shown or hidden.
-- **Hold Today** to dim it, as Applications and Recents do in edit mode: tap ✕ on a notification to dismiss it, or **Home editor** to customize.
+- **Tap and hold** to access editor: tap ✕ on a notification to dismiss it, or **Home editor** to customize.
 - **Feed:**
   - posts from social apps' notifications, kept after the notification goes;
   - public posts from Bluesky, Mastodon, YouTube, Reddit or Tumblr accounts, or any website with an RSS / Atom feed;
@@ -78,7 +76,7 @@ Hold an empty part of **Today** and tap **Home editor**. Home zooms out to show 
 ## What's new in this beta
 
 - **Home editor:** the hold menu in Today is now called Home editor. Customize sheets drop their titles to give the live preview more room, and the shared settings sit together under **System** in Customize Today.
-- **Today in edit mode:** holding Today dims it like the other views and puts ✕ on every notification you can dismiss.
+- **Today edit mode:** holding Today dims it like the other views and puts ✕ on every notification you can dismiss.
 - **Message photos:** text and chat notifications show the contact's photo with the app's badge.
 - **Parallax wallpaper:** the wallpaper drifts slightly as you swipe between views (on by default; switch it off in Customize Today).
 - **Smoother folders:** a folder near the bottom of Applications now grows and scrolls into view in one motion, and closes the same way.
@@ -134,7 +132,7 @@ The N9's firmware image is a FIASCO container. Its `rootfs` is a chunked LZO1X s
 | Taken | From the firmware |
 |---|---|
 | Layout, sizes, timings, curves | `/usr/share/themes/base/meegotouch/meegotouchhome/style/meegotouchhome.css` |
-| Colours, fonts, sizes | `/usr/share/themes/blanco/meegotouch/constants.ini` |
+| Colors, fonts, sizes | `/usr/share/themes/blanco/meegotouch/constants.ini` |
 | Settings look | `libmeegotouchviews` common styles, `duicontrolpanel` |
 | Fonts | Nokia Pure Text (and the tabular cut), `/usr/share/fonts/nokia` |
 | Artwork | Blanco theme images: icons, status icons, buttons, sliders, switches, masks |
