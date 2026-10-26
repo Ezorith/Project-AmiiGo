@@ -3,7 +3,7 @@
 **Harmattan Home** — Nokia N9's MeeGo 1.2 Harmattan home screen, rebuilt for Android.
 
 >[!NOTE]
->**BETA:** Usable in day-to-day, bugs are expected.
+>**BETA:** Usable, bugs are expected.
 
 <img width="100%" alt="views" src="https://github.com/user-attachments/assets/50fafef3-c533-4f6e-b96e-04970ee49eba" />
 
