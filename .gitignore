@@ -1,0 +1,14 @@
+# Reference material (large, proprietary) — keep out of git
+*.bin
+*.mp4
+.frames.html
+.crop.html
+
+# Build output
+.gradle/
+build/
+app/build/
+local.properties
+*.iml
+.idea/
+captures/

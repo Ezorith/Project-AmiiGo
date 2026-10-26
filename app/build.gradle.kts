@@ -1,0 +1,44 @@
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+}
+
+android {
+    namespace = "com.amiigo.harmattan"
+    compileSdk = 34
+
+    defaultConfig {
+        applicationId = "com.amiigo.harmattan"
+        minSdk = 26
+        targetSdk = 34
+        versionCode = 1
+        versionName = "1.0"
+    }
+
+    buildTypes {
+        // The N9 theme PNGs are used as-is from the firmware; don't let aapt re-encode them.
+        debug {
+            isCrunchPngs = false
+        }
+        release {
+            isMinifyEnabled = false
+            isCrunchPngs = false
+            signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+}
+
+dependencies {
+    // UI is plain framework views (full control over drawing and timing). These two are only for the
+    // optional Shizuku mode that mirrors the system's recent apps list.
+    implementation("dev.rikka.shizuku:api:13.1.5")
+    implementation("dev.rikka.shizuku:provider:13.1.5")
+    implementation("org.lsposed.hiddenapibypass:hiddenapibypass:4.3")
+}

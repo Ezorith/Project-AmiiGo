@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Harmattan Home</string>
+    <string name="settings_name">Home settings</string>
+    <string name="qtn_home_launcher_folder_default_name">Folder</string>
+    <string name="qtn_home_launcher_new_folder">New folder</string>
+
+    <!-- Strings below are the original English translations from the N9 firmware
+         (home_en.qm / notification_en.qm, PR1.3 40.2012.21-3). -->
+    <string name="qtn_home_events_empty">No notifications or feeds</string>
+    <string name="qtn_home_events_feed_refresh">Refresh</string>
+    <string name="qtn_home_events_feed_title">Feed</string>
+    <string name="done">Done</string>
+    <string name="customize">Customize</string>
+    <string name="all_settings">All settings</string>
+    <string name="panel_apps">Applications</string>
+    <string name="panel_open">Recents</string>
+    <string name="panel_today">Today</string>
+    <string name="qtn_home_recents_close_all">Close all</string>
+    <string name="qtn_home_recents_empty">Nothing open yet</string>
+    <string name="qtn_noti_clear">Clear</string>
+    <string name="qtn_noti_title">Notifications</string>
+    <string name="latest_prefix">Latest:</string>
+</resources>
