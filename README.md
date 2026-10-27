@@ -12,7 +12,7 @@
 Most "N9-style" launchers are redrawn from screenshots. Harmattan Home isn't. It was built by unpacking the N9's PR1.3 firmware (`DFL61_HARMATTAN_40.2012.21-3`) and taking the real thing apart.
 
 - **Layouts, sizes and timings** come straight from the N9 home screen's stylesheets (`meegotouchhome.css`): tile sizes, spacing, animation durations and easing curves, down to the 20 ms stagger when you close all apps.
-- **Colours, fonts and type sizes** come from the Blanco theme's constants. The text is Nokia Pure, from the firmware.
+- **Colors, fonts and type sizes** come from the Blanco theme's constants. The text is Nokia Pure, from the firmware.
 - **The motion is the N9's.** The `overshotbezier` curve was read out of `libmeegotouchcore` as a 100-point table, and the kinetic scrolling physics (`MPhysics2DPanning`: friction, edge spring, bounce) were decoded from the ARM machine code and re-implemented exactly.
 - **The weather widget** is laid out from the N9's AccuWeather home widget, decompressed from inside its extension library, with the N9's own 20 weather icons.
 
@@ -36,7 +36,7 @@ Android doesn't let a home app see or control the system's recent apps. With [Sh
 - **Live previews:** each Recents tile shows the app as you left it, using Android's own task snapshots, the closest thing to the N9's live windows. Leaving an app, its window shrinks back into its tile.
 - **Close all,** as on the N9.
 
-Without Shizuku, everything still works: Recents follows the apps you open, and tiles show app-coloured window cards.
+Without Shizuku, everything still works: Recents follows the apps you open, and tiles show app-colored window cards.
 
 ## Requirements
 
