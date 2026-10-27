@@ -12,7 +12,7 @@
 Most "N9-style" launchers are redrawn from screenshots. Harmattan Home isn't. It was built by unpacking the N9's PR1.3 firmware (`DFL61_HARMATTAN_40.2012.21-3`) and taking the real thing apart.
 
 - **Layouts, sizes and timings** come straight from the N9 home screen's stylesheets (`meegotouchhome.css`): tile sizes, spacing, animation durations and easing curves, down to the 20 ms stagger when you close all apps.
-- **Colors, fonts and type sizes** come from the Blanco theme's constants. The text is Nokia Pure, from the firmware.
+- **Colours, fonts and type sizes** come from the Blanco theme's constants. The text is Nokia Pure, from the firmware.
 - **The motion is the N9's.** The `overshotbezier` curve was read out of `libmeegotouchcore` as a 100-point table, and the kinetic scrolling physics (`MPhysics2DPanning`: friction, edge spring, bounce) were decoded from the ARM machine code and re-implemented exactly.
 - **The weather widget** is laid out from the N9's AccuWeather home widget, decompressed from inside its extension library, with the N9's own 20 weather icons.
 
@@ -26,7 +26,7 @@ The firmware only ships its artwork at the N9's 480 × 854 resolution. Instead o
 - **Fits your phone:** the status bar sits in the camera cutout, clears rounded corners, and works with the gesture pill. You can use the N9 status bar or Android's own.
 - **Per-panel sizes:** Applications, Recents, Today and the status bar can each be made bigger or smaller, along with text and icon size.
 - **Your icons, your way:** keep the N9's original icons for Phone, Messages, Web, Camera and friends; cut every other app to the N9 squircle (or circle, rounded, square…); or use any Nova / ADW icon pack.
-- **Wallpaper** behind Today, with a dark top so the date and weather stay readable, a soft blur behind the other views, and an optional parallax drift as you swipe between them.
+- **Wallpaper** behind Today, with an optional dark top so the date and weather stay readable, a soft blur behind the other views, and an optional parallax that scrolls it endlessly as you swipe between them.
 
 ### The full experience with Shizuku
 
@@ -34,20 +34,21 @@ Android doesn't let a home app see or control the system's recent apps. With [Sh
 
 - **Recents matches Android's recent apps exactly,** in the same order. Closing an app in one closes it in the other.
 - **Live previews:** each Recents tile shows the app as you left it, using Android's own task snapshots, the closest thing to the N9's live windows. Leaving an app, its window shrinks back into its tile.
+- **Close all,** as on the N9.
 
-Without Shizuku, everything still works: Recents follows the apps you open, and tiles show app-colored window cards.
+Without Shizuku, everything still works: Recents follows the apps you open, and tiles show app-coloured window cards.
 
 ## Features
 
 ### Applications
 - The N9 grid, kinetic scrolling and all.
 - **Folders:** hold an app, tap **New folder**, then drag apps in and out. Tap a folder's name to rename it.
-- Hold to rearrange, or tap ✕ to uninstall.
+- Hold to rearrange, or tap ✕ to uninstall. Apps turn half see-through while you do, as on the N9.
 - Hidden apps, chosen from an icon grid.
 
 ### Recents
 - Large tiles, switching to three to a row past a number of apps you choose (10 by default).
-- Pinch to switch between large and small tiles.
+- Pinch to switch between large and small tiles; pinch in once more for the Home editor.
 - Hold for **Done** and **Close all**; tap ✕ on a tile to close it.
 - Live previews and system Recents sync with Shizuku.
 
@@ -59,14 +60,15 @@ Without Shizuku, everything still works: Recents follows the apps you open, and 
   - posts from social apps' notifications, kept after the notification goes;
   - public posts from Bluesky, Mastodon, YouTube, Reddit or Tumblr accounts, or any website with an RSS / Atom feed;
   - each post shows its source's picture (or its first letter on grey) with the service's badge, and opens in its app when it's installed.
-- **Back to top** once you've scrolled the feed.
+- **Back to top** once five posts have scrolled by.
 
 ### Everywhere
-- Pull down at the top of any view for quick settings (or notifications).
+- **Search**, as the N9's: pull down at the top of any view, or tap the Search icon, to find an app or search the web. Pull down can open quick settings instead, or do nothing.
+- **Pinch in** on any view for the Home editor.
 - An N9 status bar that shows Android's real signal, network name, Wi-Fi activity and battery.
 
 ### Home editor
-Hold an empty part of **Today** and tap **Home editor**. Home zooms out to show the three views side by side; pick one and tap **Customize** for its settings, each with a live preview. Settings that affect every view (system notifications, status bar, scroll bars, gesture pill) are under **System** in Customize Today.
+Pinch in on any view, or hold an empty part of **Today** and tap **Home editor**. Home zooms out to show the three views side by side; pick one and tap **Customize** for its settings, each with a live preview. Settings that affect every view (system notifications, status bar, scroll bars, gesture pill, pull down) are under **System** in Customize Today.
 
 ## Requirements
 

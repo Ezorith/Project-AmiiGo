@@ -43,6 +43,57 @@ class HomeActivity : Activity() {
     // ---- Home settings: the panels zoomed out (see CustomizeOverlay) ----
     private lateinit var customize: CustomizeOverlay
     private lateinit var wallpaper: WallpaperView
+    private lateinit var search: SearchOverlay
+
+    /** Off to one of home's own sheets (Feed): coming back is not a return from an app. */
+    private var inOwnSheet = false
+
+    /** The feed's settings, as their own sheet over Today. */
+    fun openFeedSheet() {
+        inOwnSheet = true
+        startActivity(Intent(this, SettingsActivity::class.java).putExtra(SettingsActivity.EXTRA_PANEL, "feed"))
+        @Suppress("DEPRECATION")
+        overridePendingTransition(R.anim.sheet_in, R.anim.hold)
+    }
+
+    fun openSearch() {
+        if (customizing) return
+        search.top0 = home.top
+        search.open()
+    }
+
+    // Pinch in (two fingers together) anywhere on Applications or Today: the Home editor.
+    // Recents has its own pinch (large / small tiles), which opens it past the smallest layout.
+    private var pinching = false
+    private var pinchTotal = 1f
+    private var lastEvent: android.view.MotionEvent? = null
+    private val pinch by lazy {
+        android.view.ScaleGestureDetector(this, object : android.view.ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            override fun onScaleBegin(d: android.view.ScaleGestureDetector): Boolean {
+                pinching = true; pinchTotal = 1f
+                // The views under the fingers stop what they were doing (scroll, hold).
+                lastEvent?.let { e ->
+                    val c = android.view.MotionEvent.obtain(e).apply { action = android.view.MotionEvent.ACTION_CANCEL }
+                    super@HomeActivity.dispatchTouchEvent(c); c.recycle()
+                }
+                return true
+            }
+            override fun onScale(d: android.view.ScaleGestureDetector): Boolean { pinchTotal *= d.scaleFactor; return true }
+            override fun onScaleEnd(d: android.view.ScaleGestureDetector) { if (pinchTotal < 0.8f) enterCustomize(home.current) }
+        })
+    }
+
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        if (::search.isInitialized && !search.isOpen && !customizing && home.current != SWITCHER) {
+            lastEvent = ev
+            pinch.onTouchEvent(ev)
+            if (pinching) {
+                if (ev.actionMasked == android.view.MotionEvent.ACTION_UP || ev.actionMasked == android.view.MotionEvent.ACTION_CANCEL) pinching = false
+                return true
+            }
+        } else pinching = false
+        return super.dispatchTouchEvent(ev)
+    }
     var customizing = false
         private set
     private var zoom: android.animation.ValueAnimator? = null
@@ -53,6 +104,7 @@ class HomeActivity : Activity() {
     /** Zoom out to the three panels, [page] (default Today) in the middle. */
     fun enterCustomize(page: Int = EVENTS, animated: Boolean = true) {
         if (customizing) return
+        if (search.isOpen) search.close(false)
         customizing = true
         launcher.exitEditMode(); switcher.exitEditMode(); events.hideToolbar()
         home.snapTo(page, false)
@@ -69,7 +121,7 @@ class HomeActivity : Activity() {
             screenTop = home.top / k
             screenH = root.height / k
             topH = wallpaper.topH / k
-            parallaxWidth = if (Wallpaper.parallax(this@HomeActivity)) (root.width * Wallpaper.PARALLAX / k).toInt() else 0
+            phase = wallpaper.phase
             refresh(); active = true
         }
         wallpaper.active = false
@@ -171,11 +223,15 @@ class HomeActivity : Activity() {
             onAllSettings = { reopenCustomize = home.current; openHomeSettings(this) },
         ).apply { visibility = View.GONE }
         root.addView(customize, FrameLayout.LayoutParams(-1, -1))
+        // Search sits over the views, under the status bar.
+        search = SearchOverlay(this)
+        root.addView(search, root.indexOfChild(statusBar), FrameLayout.LayoutParams(-1, -1))
         if (Apps.systemStatusBar) statusBar.visibility = View.GONE
         setContentView(root)
         useFastestRefreshRate()
         animator = LaunchAnimator(this, root, home)
-        launcher.onOpen = { e, v, r -> animator.open(e, v, r) }
+        // The Search icon (Android's search app has the N9 Search role) opens the N9 search here.
+        launcher.onOpen = { e, v, r -> if (e.role == "search") openSearch() else animator.open(e, v, r) }
         switcher.onOpen = { e, v -> animator.open(e, v, Rect(0, 0, v.width, v.height)) }
 
         SystemRecents.onPermissionResult { root.post { Apps.refreshSystemRecents() } }
@@ -183,9 +239,10 @@ class HomeActivity : Activity() {
         // Sharp behind Today, blurred towards the other panels as they slide in.
         home.onOffsetChanged = { o ->
             wallpaper.blurAmount = WallpaperView.distance(o, EVENTS, 3)
-            wallpaper.drift = WallpaperView.drift(o, EVENTS, 3)
+            wallpaper.ring(o, 3)
         }
         home.snapTo(LAUNCHER, false)
+        events.onScroll = { pos -> wallpaper.todayScroll = pos * Apps.todayScale }
         EventStore.addListener { statusBar.notifier = EventStore.unseen }
 
         setupWindow()
@@ -269,8 +326,9 @@ class HomeActivity : Activity() {
 
     override fun onStop() {
         super.onStop()
+        search.close(animated = false)
         // Off to the Customize sheet: home stays as it is (zoomed out), no return animation.
-        if (customizing || reopenCustomize != null) { leftHome = false; return }
+        if (customizing || reopenCustomize != null || inOwnSheet) { leftHome = false; return }
         animator.reset()
         // Screen-off also stops the activity; only count leaving for another app.
         leftHome = getSystemService(android.os.PowerManager::class.java).isInteractive
@@ -313,10 +371,11 @@ class HomeActivity : Activity() {
             N9.init(this); Apps.reload(); recreate(); return
         }
         resumed = true
+        inOwnSheet = false
         wallpaper.topH = statusBar.barHeight + N9.px(110f) * Apps.todayScale
         wallpaper.refresh()
         wallpaper.blurAmount = WallpaperView.distance(home.offset, EVENTS, 3)
-        wallpaper.drift = WallpaperView.drift(home.offset, EVENTS, 3)
+        wallpaper.ring(home.offset, 3)
         reopenCustomize?.let { p ->
             reopenCustomize = null
             if (customizing) { customize.title = panelNames[home.current]; zoomTo(1f, false) }
@@ -366,6 +425,7 @@ class HomeActivity : Activity() {
         super.onNewIntent(intent)
         Demo.handle(this, intent)
         if (intent?.hasCategory(Intent.CATEGORY_HOME) != true) return
+        if (search.isOpen) { search.close(); return }
         val wasVisible = resumed && hasWindowFocus()
         if (customizing) { reopenCustomize = null; exitCustomize(wasVisible); return }
         launcher.exitEditMode(); switcher.exitEditMode()
@@ -378,6 +438,7 @@ class HomeActivity : Activity() {
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         when {
+            search.isOpen -> search.close()
             customizing -> exitCustomize()
             launcher.folderOpen -> launcher.closeFolder()
             launcher.inEditMode -> launcher.exitEditMode()

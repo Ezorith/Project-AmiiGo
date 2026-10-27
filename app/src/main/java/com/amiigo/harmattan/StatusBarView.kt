@@ -211,6 +211,16 @@ class StatusBarView(ctx: Context) : View(ctx) {
         if (!on) signalCallback = null
     }
 
+    /**
+     * The clock tick and the Wi-Fi activity check (twice a second) only run while home is on screen;
+     * home's window stays attached behind other apps, and they would keep waking the CPU there.
+     */
+    override fun onWindowVisibilityChanged(visibility: Int) {
+        super.onWindowVisibilityChanged(visibility)
+        main.removeCallbacks(tick); main.removeCallbacks(traffic)
+        if (visibility == VISIBLE && isAttachedToWindow) { lastBytes = -1L; main.post(tick); main.post(traffic) }
+    }
+
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
         runCatching { context.unregisterReceiver(receiver) }

@@ -85,8 +85,10 @@ class BackToTopButton(ctx: Context, private val label: String = "Back to top", p
         if (on == shown) return
         shown = on
         animate().cancel()
-        if (on) visibility = VISIBLE
-        animate().alpha(if (on) 1f else 0f).setDuration(200).setInterpolator(Ease.outExpo)
+        // Slides up into place as it fades in, and back down as it goes (250ms outexpo).
+        val slide = N9.px(80f)
+        if (on) { visibility = VISIBLE; if (alpha == 0f) translationY = slide }
+        animate().alpha(if (on) 1f else 0f).translationY(if (on) 0f else slide).setDuration(250).setInterpolator(Ease.outExpo)
             .withEndAction { if (!shown) visibility = INVISIBLE }.start()
     }
 

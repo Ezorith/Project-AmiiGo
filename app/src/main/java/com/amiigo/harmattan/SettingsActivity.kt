@@ -326,10 +326,9 @@ class SettingsActivity : Activity() {
                 applications()
             }
             "switcher" -> openApps()
+            "feed" -> feed()
             "events" -> {
                 today()
-                group("Feed")
-                feed()
                 // Settings for all three views.
                 group("System", labelled = true)
                 switchItem("System notifications", null, EventStore.showOngoing) { EventStore.setShowOngoing(it) }
@@ -338,8 +337,21 @@ class SettingsActivity : Activity() {
                 switchItem("Scroll bars", null, Apps.showScrollbars) { Apps.setShowScrollbars(it) }
                 switchItem("Gesture pill", null, Apps.showGesturePill) { Apps.setShowGesturePill(it) }
                 if (Apps.showGesturePill) switchItem("Black bar behind the pill", null, Apps.blackNavBar) { Apps.setBlackNavBar(it) }
+                pullDown()
             }
         }
+    }
+
+    /** What pulling down at the top of a view does (camera-settings style buttons). */
+    private fun pullDown() {
+        val values = listOf(Apps.PULL_SEARCH, Apps.PULL_QUICK_SETTINGS, Apps.PULL_OFF)
+        val row = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, N9.ipx(12), 0, N9.ipx(12)) }
+        row.addView(text("Pull down", 26f, Color.WHITE, bold = true))
+        row.addView(Segments(this, listOf("Search", "Quick settings", "Off"), values.indexOf(Apps.pullDown).coerceAtLeast(0), fit = true) { i ->
+            Apps.setPullDown(values[i])
+        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = N9.ipx(10) })
+        list.addView(row)
+        lastRow = null
     }
 
     private fun panelTitle(p: String) = getString(R.string.customize) + " " + when (p) {
@@ -379,8 +391,20 @@ class SettingsActivity : Activity() {
         list.removeAllViews()
         val sheet = panel
         if (sheet != null) {
-            list.setPadding(indent, 0, indent, N9.ipx(160))
+            list.setPadding(indent, N9.ipx(36), indent, N9.ipx(160))
+            // Rows fade out as they scroll up under the preview, instead of being cut off.
+            scroll.isVerticalFadingEdgeEnabled = true
+            scroll.setFadingEdgeLength(N9.ipx(56))
             pinned?.removeAllViews()
+            if (sheet == "feed") {
+                // Feeds: its own page, a title and no preview.
+                sheetHeader(getString(R.string.feeds))
+                list.setPadding(indent, N9.ipx(12), indent, N9.ipx(160))
+                panelContent(sheet)
+                list.addView(View(this), LinearLayout.LayoutParams(1, N9.ipx(40)))
+                scroll.post { scroll.scrollTo(0, y) }
+                return
+            }
             // The panel's preview, pinned under the header.
             val pv: View = when (sheet) {
                 "launcher" -> HomePreview(this).apply {
@@ -390,7 +414,7 @@ class SettingsActivity : Activity() {
                 "switcher" -> RecentsPreview(this).also { recentsPreview = it }
                 else -> TodayPreview(this).also { todayPreview = it }
             }
-            pinned?.addView(pv, LinearLayout.LayoutParams(-1, -2).apply { leftMargin = -indent; rightMargin = -indent; bottomMargin = N9.ipx(28) })
+            pinned?.addView(pv, LinearLayout.LayoutParams(-1, -2).apply { leftMargin = -indent; rightMargin = -indent; bottomMargin = N9.ipx(12) })
             panelContent(sheet)
             list.addView(View(this), LinearLayout.LayoutParams(1, N9.ipx(40)))
             scroll.post { scroll.scrollTo(0, y) }
@@ -435,17 +459,16 @@ class SettingsActivity : Activity() {
         group("Gestures")
         switchItem("Black bar behind the gesture pill", if (Apps.blackNavBar) "The pill sits on a black bar" else "The pill floats over home",
             Apps.blackNavBar) { Apps.setBlackNavBar(it) }
-        switchItem("Pull down for quick settings", if (Apps.pullOpensQuickSettings) "Pulling down at the top opens quick settings"
-            else "Pulling down at the top opens notifications", Apps.pullOpensQuickSettings) { Apps.setPullOpensQuickSettings(it) }
+        pullDown()
         switchItem("Scroll bars", "Shown while a view scrolls", Apps.showScrollbars) { Apps.setShowScrollbars(it) }
     }
 
     private fun statusBar() {
-        switchItem("N9 status bar", null, !Apps.systemStatusBar) { Apps.setSystemStatusBar(!it) }
+        switchItem("N9 status bar", null, !Apps.systemStatusBar) { Apps.setSystemStatusBar(!it); todayPreview?.n9StatusBar = !Apps.systemStatusBar }
         if (!Apps.systemStatusBar) {
             label("Size")
             sizeSlider("scale_statusbar", Apps.statusBarScale, StepSlider.Glyph.TEXT) { todayPreview?.statusScale = it }
-            switchItem("Network name", "Next to the signal bars", Apps.showOperator) { Apps.setShowOperator(it) }
+            switchItem("Network name", "Next to the signal bars", Apps.showOperator) { Apps.setShowOperator(it); todayPreview?.showOperator = it }
         }
     }
 
@@ -523,13 +546,23 @@ class SettingsActivity : Activity() {
             label("Darkness")
             list.addView(StepSlider(this, steps.size, closeTo(steps, Wallpaper.dim(this)).let { if (it < 0) 2 else it }, StepSlider.Glyph.ICON,
                 onMove = { i -> todayPreview?.dim = steps[i] }, onPick = { i -> Wallpaper.setDim(this, steps[i]) }))
-            note("How dark the wallpaper is behind notifications and the feed. The top always stays dark for the date and weather.")
+            note("How dark the wallpaper is behind notifications and the feed. Dark top keeps the date and weather readable.")
             val blurs = listOf(0f, 0.25f, 0.5f, 0.75f, 1f)
             label("Blur")
             list.addView(StepSlider(this, blurs.size, closeTo(blurs, Wallpaper.blur(this)).let { if (it < 0) 2 else it }, StepSlider.Glyph.ICON,
                 onMove = {}, onPick = { i -> Wallpaper.setBlur(this, blurs[i]) }))
             note("How blurred the wallpaper is behind Applications and Recents. Behind Today it's always sharp.")
             switchItem("Parallax", null, Wallpaper.parallax(this)) { Wallpaper.setParallax(this, it) }
+            switchItem("Dark top", null, Wallpaper.topShade(this)) { Wallpaper.setTopShade(this, it); todayPreview?.invalidate() }
+            switchItem("Phone wallpaper too", null, Wallpaper.shareWithSystem(this)) { on ->
+                Wallpaper.setShareWithSystem(this, on)
+                // Turning it on applies the current picture straight away.
+                if (on) Thread {
+                    val ok = Wallpaper.applyToSystem(this)
+                    runOnUiThread { Toast.makeText(this, if (ok) "Set as the phone's wallpaper" else "Android didn't accept the wallpaper", Toast.LENGTH_SHORT).show() }
+                }.start()
+            }
+            note("Also sets the picture as Android's home wallpaper, so Recents shows the same one. The lock screen keeps its own.")
             item("Remove wallpaper", null, drill = false) { Wallpaper.remove(this); build() }
         }
     }
@@ -625,8 +658,9 @@ class SettingsActivity : Activity() {
     /** Weather beside the date: the phone's location, a city, or off. */
     /** Android's photo picker (no storage permission needed). */
     private fun pickWallpaper() {
-        val i = if (android.os.Build.VERSION.SDK_INT >= 33) Intent(android.provider.MediaStore.ACTION_PICK_IMAGES).setType("image/*")
-            else Intent(Intent.ACTION_GET_CONTENT).setType("image/*")
+        // Android's file chooser rather than the photo picker: the picker serves a filtered copy
+        // (location removed) that came out damaged for some Samsung photos, cutting the wallpaper off.
+        val i = Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*")
         @Suppress("DEPRECATION")
         runCatching { startActivityForResult(i, REQ_WALLPAPER) }
     }
@@ -639,6 +673,7 @@ class SettingsActivity : Activity() {
         if (requestCode != REQ_WALLPAPER || resultCode != RESULT_OK || uri == null) return
         Thread {
             val ok = Wallpaper.save(this, uri)
+            if (ok && Wallpaper.shareWithSystem(this)) Wallpaper.applyToSystem(this)
             runOnUiThread { if (!ok) Toast.makeText(this, "Couldn't use that picture", Toast.LENGTH_SHORT).show(); build() }
         }.start()
     }

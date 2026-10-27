@@ -360,6 +360,9 @@ class SwitcherGrid(ctx: Context, private val panel: SwitcherPanel) : ViewGroup(c
         override fun onScale(d: ScaleGestureDetector): Boolean { total *= d.scaleFactor; return true }
         override fun onScaleEnd(d: ScaleGestureDetector) {
             // SwitcherBaseStyle pinch-length 1.0: pinch in for the 3-column overview, out for detail.
+            if (total < 0.85f && (mode === OVERVIEW || tiles.isEmpty())) {
+                (context as? HomeActivity)?.enterCustomize(HomeActivity.SWITCHER); return
+            }
             val target = when { total < 0.85f -> OVERVIEW; total > 1.15f -> DETAIL; else -> return }
             if (target !== mode && tiles.isNotEmpty()) { userMode = target; userModeCount = tiles.size; requestLayout() }
         }

@@ -62,6 +62,8 @@ open class PannableView(ctx: Context) : ViewGroup(ctx) {
     private var lastY = 0f
     private var tracker: VelocityTracker? = null
     private var running = false
+    /** Still gliding (a fling, or Back to top) from an earlier swipe. */
+    val moving: Boolean get() = running || glide != null
     private var lastFrameNs = 0L
     private var acc = 0f
     private var prevPos = 0f
@@ -221,16 +223,19 @@ open class PannableView(ctx: Context) : ViewGroup(ctx) {
                 val diff = lastY - ev.y
                 lastY = ev.y
                 val maxS = maxScroll
-                if (pos <= 0f && (diff < 0f || pullOver > 0f)) {
+                // Pull down set to Off: the N9's own edge (MPhysics2DPanning), as at the bottom. Otherwise
+                // a short firm stretch that opens search or quick settings past SHADE_PULL.
+                if (Apps.pullDown != Apps.PULL_OFF && pos <= 0f && (diff < 0f || pullOver > 0f)) {
                     // Above the top: the finger's travel past it, eased into a stretch of at most TOP_STRETCH.
                     pullOver = (pullOver - diff).coerceAtLeast(0f)
                     val lim = N9.px(TOP_STRETCH)
                     pos = -lim * (1f - kotlin.math.exp(-pullOver / (lim * 2f)))
                     if (pullOver <= 0f) pos = 0f
-                    if (startedAtTop && !shadeOpened && pullOver > N9.px(SHADE_PULL)) {
+                    if (startedAtTop && !shadeOpened && pullOver > N9.px(SHADE_PULL) && Apps.pullDown != Apps.PULL_OFF) {
                         shadeOpened = true
                         performHapticFeedback(android.view.HapticFeedbackConstants.GESTURE_THRESHOLD_ACTIVATE)
-                        expandShade(context, settings = Apps.pullOpensQuickSettings)
+                        if (Apps.pullDown == Apps.PULL_SEARCH) (context as? HomeActivity)?.openSearch()
+                        else expandShade(context, settings = true)
                     }
                 } else pos += if (pos < 0f || pos > maxS) diff * 0.5f else diff
                 lastMoveTime = System.currentTimeMillis()
@@ -240,7 +245,7 @@ open class PannableView(ctx: Context) : ViewGroup(ctx) {
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 track(ev)
                 pressed = false
-                if (dragging && pos < 0f) {
+                if (dragging && pos < 0f && Apps.pullDown != Apps.PULL_OFF) {
                     vel = 0f; start() // spring back from the stretch
                 } else if (dragging) {
                     val t = tracker

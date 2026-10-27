@@ -339,9 +339,12 @@ object Apps {
     private var taskIds: Map<String, Int> = emptyMap()
     fun taskIdFor(e: AppEntry): Int? = taskIds[e.key]
 
-    /** Pulling down at the top of a view opens quick settings (else the notification panel). */
-    val pullOpensQuickSettings: Boolean get() = prefs.getBoolean("pull_quick_settings", true)
-    fun setPullOpensQuickSettings(on: Boolean) { prefs.edit().putBoolean("pull_quick_settings", on).apply() }
+    /** What pulling down at the top of a view does: [PULL_SEARCH], [PULL_QUICK_SETTINGS] or [PULL_OFF]. */
+    val pullDown: String get() = prefs.getString("pull_down", PULL_SEARCH)!!
+    fun setPullDown(v: String) { prefs.edit().putString("pull_down", v).apply() }
+    const val PULL_SEARCH = "search"
+    const val PULL_QUICK_SETTINGS = "quick_settings"
+    const val PULL_OFF = "off"
 
     /** Open apps keeps its two-column large tiles up to this many apps; more go three to a row. */
     val switcherLargeMax: Int get() = prefs.getInt("switcher_large", 10)

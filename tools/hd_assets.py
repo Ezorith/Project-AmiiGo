@@ -21,9 +21,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "app", "art", "n9-1x")
 DST = os.path.join(ROOT, "app", "src", "main", "res", "drawable-nodpi")
 
-SOFT = ("n9_gradient", "n9_video_overlay", "n9_event_pressed", "n9_home_event_bg")
+SOFT = ("n9_gradient", "n9_search_header", "n9_video_overlay", "n9_event_pressed", "n9_home_event_bg")
 # Flat glyphs: the crispest edges.
-GLYPH = ("n9_status_", "n9_media_", "n9_close_thumbnail", "n9_position_indicator", "n9_event_icon_mask",
+GLYPH = ("n9_status_", "n9_icon_search", "n9_media_", "n9_close_thumbnail", "n9_position_indicator", "n9_event_icon_mask",
          "n9_home_button")
 
 

@@ -395,7 +395,13 @@ class LauncherGrid(ctx: Context, private val panel: LauncherPanel) : ViewGroup(c
         openFolder?.let { f -> for (a in Demo.folderApps(f.apps)) { val li = LItem.App(a); folderButtons += buttonFor(li); wanted += li.key } }
         val dead = buttons.keys.filter { it !in wanted && buttons[it] !== dragged }
         for (k in dead) { removeView(buttons[k]); buttons.remove(k) }
-        if (editMode) for (b in mainButtons + folderButtons) if (b.closable && b.badge == 0f) b.animateBadge(true) { invalidate() }
+        // ✕ on what can be removed in edit mode; off everywhere else (a folder that just got an app
+        // isn't removable any more, and must not keep its ✕).
+        for (b in mainButtons + folderButtons) {
+            val want = editMode && b.closable
+            if (want && b.badge == 0f) b.animateBadge(true) { invalidate() }
+            else if (!want && (b.badge > 0f || b.badgeAlpha > 0f)) b.animateBadge(false) { invalidate() }
+        }
         updateOpacities()
     }
 
@@ -523,7 +529,10 @@ class LauncherGrid(ctx: Context, private val panel: LauncherPanel) : ViewGroup(c
     fun setEditMode(on: Boolean) {
         if (editMode == on) return
         editMode = on
-        for (b in mainButtons + folderButtons) if (b.closable) b.animateBadge(on) { invalidate() }
+        for (b in mainButtons + folderButtons) {
+            if (on && b.closable) b.animateBadge(true) { invalidate() }
+            else if (!on && (b.badge > 0f || b.badgeAlpha > 0f)) b.animateBadge(false) { invalidate() }
+        }
         updateOpacities()
         panel.onEditModeChanged(on)
         if (!on) finishRename()

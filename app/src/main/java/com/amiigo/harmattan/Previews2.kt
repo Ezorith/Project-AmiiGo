@@ -69,7 +69,7 @@ class RecentsPreview(ctx: Context) : PanelPreview(ctx) {
     }
 }
 
-/** Today: the date and weather, and the first notifications. */
+/** Today: the status bar (N9 or Android's), the date and weather, the notifications and the feed. */
 class TodayPreview(ctx: Context) : PanelPreview(ctx) {
     var scale = Apps.todayScale; set(v) { field = v; invalidate() }
     var statusScale = Apps.statusBarScale; set(v) { field = v; invalidate() }
@@ -96,8 +96,53 @@ class TodayPreview(ctx: Context) : PanelPreview(ctx) {
             Wallpaper.drawCover(c, it, android.graphics.Rect(0, 0, width, screenH), bmp)
             Wallpaper.drawShade(c, width, screenH, (8f + 110f * scale) * u0, dim, shade)
         }
-        // Today, at its size (no status bar: the preview is just the view).
-        var top = 8f * u0
+        // Status bar, as home shows it (the N9's or Android's).
+        var top: Float
+        val clock = android.text.format.DateFormat.getTimeFormat(context).format(Date()).replace(Regex("\\s?[AaPp][Mm]$"), "")
+        if (n9StatusBar) {
+            val k = u0 * statusScale
+            val h = 36f * k
+            val iconH = 15f * k
+            val cy = h / 2f
+            var x = 8f * k
+            fun icon(res: Int, cropL: Int = 0) {
+                val b = N9.bitmap(context, res)
+                val w = iconH * (b.width - cropL) / b.height
+                c.drawBitmap(b, android.graphics.Rect(cropL, 0, b.width, b.height), RectF(x, cy - iconH / 2f, x + w, cy + iconH / 2f), bmp)
+                x += w + 6f * k
+            }
+            icon(R.drawable.n9_status_battery8)
+            icon(R.drawable.n9_status_network5, 4 * N9.HD)
+            if (showOperator) {
+                val op = if (Demo.items != null) "Harmattan" else runCatching {
+                    context.getSystemService(android.telephony.TelephonyManager::class.java)?.networkOperatorName
+                }.getOrNull().orEmpty().ifEmpty { "Operator" }
+                p.textSize = N9.FONT_XSMALL * k
+                text(c, op, x, cy - (p.ascent() + p.descent()) / 2f, N9.FONT_XSMALL * k, N9.regular, Color.WHITE)
+                x += p.measureText(op) + 8f * k
+            }
+            icon(R.drawable.n9_status_wlan)
+            p.textSize = N9.FONT_XSMALL * k; p.typeface = N9.regular
+            text(c, clock, width - 8f * k - p.measureText(clock), cy - (p.ascent() + p.descent()) / 2f, N9.FONT_XSMALL * k, N9.regular, Color.WHITE)
+            top = h
+        } else {
+            // Android's own bar, as One UI draws it: the clock on the left, signal, Wi-Fi and battery on the right.
+            val h = 40f * u0
+            val cy = h / 2f
+            p.textSize = 18f * u0
+            text(c, clock, 18f * u0, cy - (p.ascent() + p.descent()) / 2f, 18f * u0, N9.bold, Color.WHITE)
+            val iconH = 13f * u0
+            var x = width - 18f * u0
+            for ((res, crop) in listOf(R.drawable.n9_status_battery8 to 0, R.drawable.n9_status_wlan to 0, R.drawable.n9_status_network5 to 4 * N9.HD)) {
+                val b = N9.bitmap(context, res)
+                val w = iconH * (b.width - crop) / b.height
+                x -= w
+                c.drawBitmap(b, android.graphics.Rect(crop, 0, b.width, b.height), RectF(x, cy - iconH / 2f, x + w, cy + iconH / 2f), bmp)
+                x -= 6f * u0
+            }
+            top = h
+        }
+        // Today, at its size.
         val u = u0 * scale
         val t = N9.textScale
         top += 2f * u
@@ -114,24 +159,44 @@ class TodayPreview(ctx: Context) : PanelPreview(ctx) {
         }
         top += 96f * u
         val left = 14f * u0; val right = width - 14f * u0
+        val notes = EventStore.notifications
+        if (notes.isNotEmpty()) {
+            c.drawRect(left, top, right, top + maxOf(1f, u), line)
+            top += 12f * u
+            // The heading and Clear only with something to clear, as in Today.
+            if (notes.any { it.clearable }) { heading(c, R.string.qtn_noti_title, R.string.qtn_noti_clear, left, right, top, u, t); top += 52f * u }
+            for (n in notes) {
+                n.icon?.let { c.drawBitmap(it, null, RectF(left + 2f * u, top + 10f * u, left + 66f * u, top + 74f * u), bmp) }
+                val tx = left + 82f * u
+                text(c, n.title, tx, top + 30f * u * t, 22f * u * t, N9.regular, Color.WHITE, right - tx)
+                n.subtitle?.let { text(c, it, tx, top + 54f * u * t, 16f * u * t, N9.regular, 0xFFC8C8C8.toInt(), right - tx) }
+                top += 100f * u
+                if (top > height) return
+            }
+        }
+        val feed = EventStore.feed
+        if (feed.isEmpty() && EventStore.rssSources.isEmpty()) return
         c.drawRect(left, top, right, top + maxOf(1f, u), line)
         top += 12f * u
-        if (EventStore.notifications.none { it.clearable }) return
-        // Notifications heading and Clear.
-        text(c, context.getString(R.string.qtn_noti_title), left + 2f * u, top + 26f * u, 24f * u * t, N9.bold, 0xFF646464.toInt())
+        heading(c, R.string.qtn_home_events_feed_title, R.string.qtn_home_events_feed_refresh, left, right, top, u, t)
+        top += 52f * u
+        for (f in feed) {
+            f.icon?.let { c.drawBitmap(it, null, RectF(left + 2f * u, top + 8f * u, left + 66f * u, top + 72f * u), bmp) }
+            val tx = left + 82f * u
+            text(c, f.title, tx, top + 28f * u * t, 22f * u * t, N9.bold, Color.WHITE, right - tx)
+            (f.body ?: f.subtitle)?.let { text(c, it, tx, top + 54f * u * t, 22f * u * t, N9.regular, Color.WHITE, right - tx) }
+            top += 92f * u
+            if (top > height) return
+        }
+    }
+
+    /** A section heading (Notifications / Feed) with its button on the right. */
+    private fun heading(c: Canvas, title: Int, button: Int, left: Float, right: Float, top: Float, u: Float, t: Float) {
+        text(c, context.getString(title), left + 2f * u, top + 26f * u, 24f * u * t, N9.bold, 0xFF646464.toInt())
         val pr = RectF(right - 160f * u, top, right, top + 31f * u)
         pill.setBounds(pr.left.toInt(), pr.top.toInt(), pr.right.toInt(), pr.bottom.toInt()); pill.draw(c)
-        val clr = context.getString(R.string.qtn_noti_clear)
+        val label = context.getString(button)
         p.textSize = 20f * u * t; p.typeface = N9.bold
-        text(c, clr, pr.centerX() - p.measureText(clr) / 2f, pr.centerY() - (p.ascent() + p.descent()) / 2f, 20f * u * t, N9.bold, Color.WHITE)
-        top += 52f * u
-        for (n in EventStore.notifications.take(3)) {
-            n.icon?.let { c.drawBitmap(it, null, RectF(left + 2f * u, top + 10f * u, left + 66f * u, top + 74f * u), bmp) }
-            val tx = left + 82f * u
-            text(c, n.title, tx, top + 30f * u * t, 22f * u * t, N9.regular, Color.WHITE, right - tx)
-            n.subtitle?.let { text(c, it, tx, top + 54f * u * t, 16f * u * t, N9.regular, 0xFFC8C8C8.toInt(), right - tx) }
-            top += 100f * u
-            if (top > height) break
-        }
+        text(c, label, pr.centerX() - p.measureText(label) / 2f, pr.centerY() - (p.ascent() + p.descent()) / 2f, 20f * u * t, N9.bold, Color.WHITE)
     }
 }

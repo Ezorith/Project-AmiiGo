@@ -3,6 +3,8 @@
 
     <!-- Feed (RSS/Atom sources) -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Customize Today → Wallpaper → Phone wallpaper too. -->
+    <uses-permission android:name="android.permission.SET_WALLPAPER" />
     <!-- Weather beside the date in Today, when "Where I am" is chosen. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
