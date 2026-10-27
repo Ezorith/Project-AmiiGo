@@ -38,38 +38,6 @@ Android doesn't let a home app see or control the system's recent apps. With [Sh
 
 Without Shizuku, everything still works: Recents follows the apps you open, and tiles show app-coloured window cards.
 
-## Features
-
-### Applications
-- The N9 grid, kinetic scrolling and all.
-- **Folders:** hold an app, tap **New folder**, then drag apps in and out. Tap a folder's name to rename it.
-- Hold to rearrange, or tap ✕ to uninstall. Apps turn half see-through while you do, as on the N9.
-- Hidden apps, chosen from an icon grid.
-
-### Recents
-- Large tiles, switching to three to a row past a number of apps you choose (10 by default).
-- Pinch to switch between large and small tiles; pinch in once more for the Home editor.
-- Hold for **Done** and **Close all**; tap ✕ on a tile to close it.
-- Live previews and system Recents sync with Shizuku.
-
-### Today
-- The date with an N9 weather widget. Weather comes from [Open-Meteo](https://open-meteo.com/) (free, no account), for your location or a city you choose, in °C or °F.
-- **Notifications** with each app's own icon. Messages show the sender's photo and music its album art, each with the app as a badge. Tap to open and clear; system ones (charging, USB…) can be shown or hidden.
-- **Tap and hold** to access editor: tap ✕ on a notification to dismiss it, or **Home editor** to customize.
-- **Feed:**
-  - posts from social apps' notifications, kept after the notification goes;
-  - public posts from Bluesky, Mastodon, YouTube, Reddit or Tumblr accounts, or any website with an RSS / Atom feed;
-  - each post shows its source's picture (or its first letter on grey) with the service's badge, and opens in its app when it's installed.
-- **Back to top** once five posts have scrolled by.
-
-### Everywhere
-- **Search**, as the N9's: pull down at the top of any view, or tap the Search icon, to find an app or search the web. Pull down can open quick settings instead, or do nothing.
-- **Pinch in** on any view for the Home editor.
-- An N9 status bar that shows Android's real signal, network name, Wi-Fi activity and battery.
-
-### Home editor
-Pinch in on any view, or hold an empty part of **Today** and tap **Home editor**. Home zooms out to show the three views side by side; pick one and tap **Customize** for its settings, each with a live preview. Settings that affect every view (system notifications, status bar, scroll bars, gesture pill, pull down) are under **System** in Customize Today.
-
 ## Requirements
 
 - **Android 8.0 or newer.** Wallpaper blur needs Android 12 or newer.
