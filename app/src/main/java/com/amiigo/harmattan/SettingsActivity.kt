@@ -351,11 +351,6 @@ class SettingsActivity : Activity() {
                 group("System", labelled = true)
                 switchItem("System notifications", null, EventStore.showOngoing) { EventStore.setShowOngoing(it) }
                 note("Show undismissable system notifications in Today, like charging, USB options and downloads.")
-                statusBar()
-                switchItem("Scroll bars", null, Apps.showScrollbars) { Apps.setShowScrollbars(it) }
-                switchItem("Gesture pill", null, Apps.showGesturePill) { Apps.setShowGesturePill(it) }
-                if (Apps.showGesturePill) switchItem("Black bar behind the pill", null, Apps.blackNavBar) { Apps.setBlackNavBar(it) }
-                pullDown()
             }
         }
     }
@@ -385,13 +380,13 @@ class SettingsActivity : Activity() {
         Section("Applications", R.drawable.n9_settings_applications, {
             val n = Apps.hidden.count { k -> Apps.installed.any { it.key == k } }
             if (n == 0) "No hidden apps" else "$n hidden apps" }) { applications() },
-        Section("Overview", R.drawable.n9_settings_description, {
+        Section("Overview", R.drawable.n9_settings_overview, {
             if (SystemRecents.granted()) "Matches the system's recent apps" else "Follows the apps you open" }) { openApps() },
         Section("Today", R.drawable.n9_settings_time_date, {
             when (Weather.mode) { Weather.MODE_OFF -> "Notifications, weather off"; else -> "Notifications, weather" } }) { today() },
         Section("Feed", R.drawable.n9_settings_notification, {
             val n = EventStore.rssSources.size; if (n == 0) "Social apps" else "Social apps, $n sources" }) { feed() },
-        Section("About", R.drawable.n9_app_theme, { "Version $version" }) { about() },
+        Section("About", R.drawable.n9_settings_description, { "Version $version" }) { about() },
     ) }
 
     private fun permissionsSummary(): String {
@@ -443,7 +438,7 @@ class SettingsActivity : Activity() {
         if (p == null) {
             header(getString(R.string.settings_name))
             list.addView(View(this), LinearLayout.LayoutParams(1, N9.ipx(8)))
-            for (sec in sections) item(sec.name, sec.summary(), sec.icon) { page = sec.name; build(); scroll.post { scroll.scrollTo(0, 0) } }
+            for (sec in sections) item(sec.name, sec.summary(), sec.icon) { goTo(sec.name) }
         } else {
             header(p.name)
             p.content()
@@ -453,9 +448,27 @@ class SettingsActivity : Activity() {
     }
 
     @Deprecated("Deprecated in Java")
+    /**
+     * Into a category ([to]) or back to the list (null): the page slides out and the next slides in
+     * from the side it comes from (MApplicationPage navigation: 250ms outexpo).
+     */
+    private var paging = false
+    private fun goTo(to: String?) {
+        if (paging) return
+        paging = true
+        val forward = to != null
+        val shift = scroll.width * 0.3f * (if (forward) 1f else -1f)
+        scroll.animate().cancel()
+        scroll.animate().translationX(-shift).alpha(0f).setDuration(120).setInterpolator(Ease.linear).withEndAction {
+            page = to; build(); scroll.scrollTo(0, 0)
+            scroll.translationX = shift
+            scroll.animate().translationX(0f).alpha(1f).setDuration(250).setInterpolator(Ease.outExpo).withEndAction { paging = false }.start()
+        }.start()
+    }
+
     override fun onBackPressed() {
         if (panel != null) closeSheet()
-        else if (page != null) { page = null; build(); scroll.post { scroll.scrollTo(0, 0) } }
+        else if (page != null) goTo(null)
         else @Suppress("DEPRECATION") super.onBackPressed()
     }
 
@@ -476,7 +489,9 @@ class SettingsActivity : Activity() {
     private fun appearancePage() {
         appearance()
         group("Gestures")
-        switchItem("Black bar behind the gesture pill", if (Apps.blackNavBar) "The pill sits on a black bar" else "The pill floats over home",
+        switchItem("Gesture pill", if (Apps.showGesturePill) "Shown at the bottom of home" else "Hidden; swiping up still works",
+            Apps.showGesturePill) { Apps.setShowGesturePill(it) }
+        if (Apps.showGesturePill) switchItem("Black bar behind the gesture pill", if (Apps.blackNavBar) "The pill sits on a black bar" else "The pill floats over home",
             Apps.blackNavBar) { Apps.setBlackNavBar(it) }
         pullDown()
         switchItem("Scroll bars", "Shown while a view scrolls", Apps.showScrollbars) { Apps.setShowScrollbars(it) }
@@ -649,10 +664,6 @@ class SettingsActivity : Activity() {
             }
         }
         if (matching) switchItem("Live previews", null, Apps.livePreviews) { Apps.setLivePreviews(it) }
-        group("Backup")
-        item("Back up home", null) { startBackup() }
-        item("Restore from a backup", null) { startRestore() }
-        note("Saves app positions, folders, hidden apps, sizes, the wallpaper, the feed and the weather place to a file. Recents aren't included.")
     }
 
     private fun today() {

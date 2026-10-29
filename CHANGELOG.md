@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.2-beta — 29 October 2026
 
 ### Added
 - **About** (Settings → About): Harmattan Home's icon and version, Create backup, Restore backup and Check for updates (looks for a newer release on GitHub), and these release notes.
@@ -8,7 +8,9 @@
 - **Rename apps** (Customize Applications): give any app your own name; "Original name" puts it back.
 
 ### Changed
-- Recents is now called **Overview**.
+- Recents is now called **Overview**, with its own icon in Home settings.
+- **Home settings:** categories slide in and out as N9 pages do; the Appearance icon matches the others.
+- **Customize Today** keeps System notifications; the status bar, scroll bars, gesture pill and pull down settings are in Home settings (Status bar and Appearance). Backup and restore moved from Customize Overview to About.
 - Holding Today shows **Feed** and **Settings** (the Home editor is a pinch away).
 - Customize Applications: **Icons** comes before **Icon shape**, and both are camera-style grids, four to a row, each tile showing the icon it gives.
 
