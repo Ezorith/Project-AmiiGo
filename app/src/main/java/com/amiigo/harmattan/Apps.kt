@@ -127,7 +127,6 @@ object Apps {
     private val STATIC_ROLES = mapOf(
         "com.google.android.dialer" to "telephony", "com.android.dialer" to "telephony", "com.samsung.android.dialer" to "telephony",
         "com.google.android.contacts" to "contacts", "com.android.contacts" to "contacts", "com.samsung.android.app.contacts" to "contacts",
-        "com.google.android.googlequicksearchbox" to "search",
         "com.android.chrome" to "browser", "com.sec.android.app.sbrowser" to "browser",
         "com.google.android.apps.messaging" to "conversation", "com.samsung.android.messaging" to "conversation",
         "com.google.android.gm" to "email", "com.samsung.android.email.provider" to "email",
@@ -219,11 +218,48 @@ object Apps {
             if (role != null && !seenRoles.add(role)) role = null
             build(info, role, pack)
         }
-        installed = built
+        installed = built + searchEntry()
         val hide = hidden
-        all = sortByOrder(built.filter { it.key !in hide })
+        // An app that switched launcher activity (apps like Duolingo do, to change their icon) keeps
+        // being hidden under its new name.
+        val hideMoved = hide.filter { k -> installed.none { it.key == k } }.mapNotNull { pkgUser(it) }.toSet()
+        all = sortByOrder(installed.filter { it.key !in hide && pkgUser(it.key) !in hideMoved })
         listeners.forEach { it() }
         recentListeners.forEach { it() }
+    }
+
+    // ---- the N9 Search, as an app of its own ----
+
+    const val SEARCH_CLASS = "com.amiigo.harmattan.N9Search"
+    val searchKey: String get() = keyOf(ComponentName(app.packageName, SEARCH_CLASS), Process.myUserHandle())
+    fun isSearch(e: AppEntry) = e.component.className == SEARCH_CLASS && e.pkg == app.packageName
+
+    /** The N9 Search icon, in whatever shape the icons are cut to (with any icon style). */
+    private fun searchEntry(): AppEntry {
+        val size = N9.ipx(80f * iconScale * appsScale.coerceAtLeast(1f))
+        val art = Bitmap.createScaledBitmap(N9.bitmap(app, R.drawable.n9_app_search), size, size, true)
+        val shape = iconShape
+        val icon = if (shape == SHAPE_N9 || shape == SHAPE_ORIGINAL) art else applyMask(art, shapeMask(shape, size))
+        val c = ComponentName(app.packageName, SEARCH_CLASS)
+        return AppEntry(c, Process.myUserHandle(), labelFor(keyOf(c, Process.myUserHandle())) ?: "Search", icon, "search", false, averageColor(icon))
+    }
+
+    /** "package#user" of a launcher key, to find an app again after its activity changed. */
+    private fun pkgUser(key: String): String? {
+        val slash = key.indexOf('/'); val hash = key.lastIndexOf('#')
+        return if (slash < 0 || hash < 0) null else key.substring(0, slash) + key.substring(hash)
+    }
+
+    // ---- names chosen by the user (Customize Applications → Rename apps) ----
+
+    private fun renames(): org.json.JSONObject = runCatching { org.json.JSONObject(prefs.getString("labels", "{}")!!) }.getOrDefault(org.json.JSONObject())
+    fun labelFor(key: String): String? = renames().optString(key, "").ifEmpty { null }
+    /** Give the app with [key] its own name ([name] null or blank: its own name again). */
+    fun setLabel(key: String, name: String?) {
+        val o = renames()
+        if (name.isNullOrBlank()) o.remove(key) else o.put(key, name.trim())
+        prefs.edit().putString("labels", o.toString()).apply()
+        reload()
     }
 
     private fun build(info: LauncherActivityInfo, role: String?, pack: IconPacks.Loaded?): AppEntry {
@@ -234,7 +270,8 @@ object Apps {
         // Work-profile badge goes on after shaping.
         val badged = app.packageManager.getUserBadgedIcon(android.graphics.drawable.BitmapDrawable(app.resources, raw), info.user)
         val icon = if (badged is android.graphics.drawable.BitmapDrawable) badged.bitmap else render(badged, size)
-        val label = if (useN9) ROLE_NAME[role] ?: info.label.toString() else info.label.toString()
+        val label = labelFor(keyOf(info.componentName, info.user))
+            ?: if (useN9) ROLE_NAME[role] ?: info.label.toString() else info.label.toString()
         val flags = info.applicationInfo.flags
         val removable = flags and ApplicationInfo.FLAG_SYSTEM == 0 || flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0
         val e = AppEntry(info.componentName, info.user, label, icon, if (useN9) role else null, removable && info.componentName.packageName != app.packageName, averageColor(icon))
@@ -490,8 +527,18 @@ object Apps {
         private set
 
     private fun sortByOrder(list: List<AppEntry>): List<AppEntry> {
-        val byKey = list.associateBy { it.key }
+        val exact = list.associateBy { it.key }
         val used = HashSet<String>()
+        // Apps that change their icon by switching launcher activity get a new key; they keep the old
+        // one's place (in the grid or in a folder) instead of dropping to the end.
+        val savedKeys = HashSet<String>()
+        runCatching {
+            val o = org.json.JSONObject(prefs.getString("folders", "{}")!!)
+            for (id in o.keys()) { val a = o.getJSONObject(id).optJSONArray("apps") ?: continue; for (i in 0 until a.length()) savedKeys += a.getString(i) }
+        }
+        prefs.getString("order2", null)?.split('\n')?.forEach { if (it.startsWith("a:")) savedKeys += it.substring(2) }
+        val moved = list.filter { it.key !in savedKeys }.groupBy { pkgUser(it.key) }
+        fun find(key: String): AppEntry? = exact[key] ?: moved[pkgUser(key)]?.firstOrNull { it.key !in used }
         // Folders: {"<id>": {"name": "...", "apps": ["key", ...]}}
         val folders = LinkedHashMap<String, Folder>()
         runCatching {
@@ -499,7 +546,7 @@ object Apps {
             for (id in o.keys()) {
                 val f = o.getJSONObject(id)
                 val arr = f.optJSONArray("apps") ?: org.json.JSONArray()
-                val apps = (0 until arr.length()).mapNotNull { byKey[arr.getString(it)] }.filter { used.add(it.key) }
+                val apps = (0 until arr.length()).mapNotNull { find(arr.getString(it)) }.filter { used.add(it.key) }
                 folders[id] = Folder(id, f.optString("name", "Folder"), apps.toMutableList())
             }
         }
@@ -508,18 +555,24 @@ object Apps {
         if (saved != null) {
             for (l in saved) when {
                 l.startsWith("f:") -> folders.remove(l.substring(2))?.let { out += LItem.Dir(it) }
-                l.startsWith("a:") -> byKey[l.substring(2)]?.takeIf { used.add(it.key) }?.let { out += LItem.App(it) }
+                l.startsWith("a:") -> find(l.substring(2))?.takeIf { used.add(it.key) }?.let { out += LItem.App(it) }
             }
             folders.values.forEach { out += LItem.Dir(it) }
         } else {
             val old = prefs.getString("order", null)?.split('\n')?.filter { it.isNotEmpty() }
-            if (old != null) for (k in old) byKey[k]?.takeIf { used.add(it.key) }?.let { out += LItem.App(it) }
+            if (old != null) for (k in old) find(k)?.takeIf { used.add(it.key) }?.let { out += LItem.App(it) }
             else {
                 val roleIdx = DEFAULT_ORDER.withIndex().associate { it.value to it.index }
                 fun rank(e: AppEntry) = roleIdx[e.role ?: roleOf(e.pkg) ?: ""] ?: Int.MAX_VALUE
                 list.sortedWith(compareBy<AppEntry> { rank(it) }.thenBy { it.label.lowercase() })
                     .forEach { used.add(it.key); out += LItem.App(it) }
             }
+        }
+        // The N9 Search, new to a saved layout: where the app with the Search role was, else first.
+        list.firstOrNull { isSearch(it) && it.key !in used }?.let { s ->
+            used.add(s.key)
+            val at = out.indexOfFirst { it is LItem.App && it.e.pkg == "com.google.android.googlequicksearchbox" }
+            out.add(if (at >= 0) at else 0, LItem.App(s))
         }
         // Newly installed apps go to the end, like on the N9.
         list.filter { it.key !in used }.sortedBy { it.label.lowercase() }.forEach { out += LItem.App(it) }
@@ -546,6 +599,7 @@ object Apps {
 
     /** Start [e]. [bounds] is the icon/tile on screen, [opts] the window animation (see LaunchAnimator). */
     fun launch(e: AppEntry, bounds: Rect?, opts: android.os.Bundle?) {
+        if (isSearch(e)) return // opened by home itself (HomeActivity)
         if (e.pkg == Demo.PKG) return // a demo grid's stand-in: nothing to open
         runCatching { launcherApps.startMainActivity(e.component, e.user, bounds, opts) }
         noteOpened(e)

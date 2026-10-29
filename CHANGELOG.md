@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **About** (Settings → About): Harmattan Home's icon and version, Create backup, Restore backup and Check for updates (looks for a newer release on GitHub), and these release notes.
+- **Search as an app:** the N9 Search has its own icon in Applications, with any icon style. Google's app now shows as itself.
+- **Rename apps** (Customize Applications): give any app your own name; "Original name" puts it back.
+
+### Changed
+- Recents is now called **Overview**.
+- Holding Today shows **Feed** and **Settings** (the Home editor is a pinch away).
+- Customize Applications: **Icons** comes before **Icon shape**, and both are camera-style grids, four to a row, each tile showing the icon it gives.
+
+### Fixed
+- Apps that change their own icon (such as Duolingo) no longer jump to the end of Applications or out of their folder when it changes.
+
 ## 1.0.1 — 27 October 2026
 
 ### Added

@@ -4,6 +4,7 @@
     <string name="settings_name">Home settings</string>
     <string name="home_editor">Home editor</string>
     <string name="feeds">Feed</string>
+    <string name="settings">Settings</string>
     <!-- Search (search_en.qm: "Search"); result kinds as the N9 Search listed them. -->
     <string name="search">Search</string>
     <string name="search_kind_app">Application</string>
@@ -21,7 +22,7 @@
     <string name="customize">Customize</string>
     <string name="all_settings">All settings</string>
     <string name="panel_apps">Applications</string>
-    <string name="panel_open">Recents</string>
+    <string name="panel_open">Overview</string>
     <string name="panel_today">Today</string>
     <string name="qtn_home_recents_close_all">Close all</string>
     <string name="qtn_home_recents_empty">Nothing open yet</string>

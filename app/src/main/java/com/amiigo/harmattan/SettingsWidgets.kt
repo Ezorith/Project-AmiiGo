@@ -297,7 +297,10 @@ private class AppCell(ctx: Context) : View(ctx) {
  */
 fun pickApps(
     ctx: Context, title: String, help: String, apps: List<AppEntry>, chosen: Set<String>,
-    keyOf: (AppEntry) -> String, dim: Boolean, done: (Set<String>) -> Unit,
+    keyOf: (AppEntry) -> String, dim: Boolean,
+    /** Pick one app: tapping it closes the grid and hands it over (no Cancel / Done). */
+    one: ((AppEntry) -> Unit)? = null,
+    done: (Set<String>) -> Unit,
 ) {
     val sel = chosen.toMutableSet()
     val d = Dialog(ctx, android.R.style.Theme_DeviceDefault_NoActionBar)
@@ -332,6 +335,7 @@ fun pickApps(
             }
         }
         setOnItemClickListener { _, v, p, _ ->
+            if (one != null) { v.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY); d.dismiss(); one(apps[p]); return@setOnItemClickListener }
             val k = keyOf(apps[p])
             if (!sel.add(k)) sel.remove(k)
             (v as AppCell).chosen = k in sel; v.invalidate()
@@ -342,7 +346,8 @@ fun pickApps(
     root.addView(grid, LinearLayout.LayoutParams(-1, 0, 1f))
 
     // Bottom bar: Cancel / Done side by side, the same toolbar as the switcher's Done / Close all.
-    val toolbar = EditToolbar(ctx, listOf("Cancel" to { d.dismiss() }, "Done" to { d.dismiss(); done(sel) }), inRow = true)
+    val toolbar = EditToolbar(ctx, if (one != null) listOf("Cancel" to { d.dismiss() })
+        else listOf("Cancel" to { d.dismiss() }, "Done" to { d.dismiss(); done(sel) }), inRow = one == null)
     root.addView(toolbar, LinearLayout.LayoutParams(-1, -2))
     toolbar.post { toolbar.show(true) }
 
@@ -403,6 +408,78 @@ class N9Switch(ctx: Context, var on: Boolean, private val onChange: (Boolean) ->
             MotionEvent.ACTION_DOWN -> { down = true; invalidate() }
             MotionEvent.ACTION_UP -> { down = false; invalidate(); flip() }
             MotionEvent.ACTION_CANCEL -> { down = false; invalidate() }
+        }
+        return true
+    }
+}
+
+/**
+ * Camera-settings style choices (the N9 camera's Scene grid): a row of rounded tiles, the chosen one
+ * blue, each with a picture and its name under it; [columns] to a row. Pictures arrive later through
+ * [setIcon] (they're drawn off the main thread).
+ */
+@SuppressLint("ViewConstructor")
+class IconChoices(ctx: Context, private val labels: List<String>, var selected: Int, private val columns: Int = 4,
+                  private val onPick: (Int) -> Unit) : View(ctx) {
+    private val icons = arrayOfNulls<android.graphics.Bitmap>(labels.size)
+    private val tile = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val bmpPaint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
+    private val text = TextPaint(N9.textPaint(N9.regular, 20f, 0xFFE0E0E0.toInt()))
+    private val tileSize get() = N9.px(64f)
+    private val rowH get() = tileSize + N9.px(40f)
+    private var down = -1
+
+    fun setIcon(i: Int, b: android.graphics.Bitmap?) { icons[i] = b; invalidate() }
+
+    override fun onMeasure(w: Int, h: Int) {
+        val rows = (labels.size + columns - 1) / columns
+        setMeasuredDimension(MeasureSpec.getSize(w), (rows * rowH + N9.px(8f)).toInt())
+    }
+
+    private fun cell(i: Int): RectF {
+        val cw = width / columns.toFloat()
+        val cx = cw * (i % columns) + cw / 2f
+        val top = N9.px(4f) + (i / columns) * rowH
+        return RectF(cx - tileSize / 2f, top, cx + tileSize / 2f, top + tileSize)
+    }
+
+    override fun onDraw(c: Canvas) {
+        val cw = width / columns.toFloat()
+        for (i in labels.indices) {
+            val r = cell(i)
+            tile.color = when { i == selected -> 0xFF1A83DA.toInt(); i == down -> 0xFF4A4A4A.toInt(); else -> 0xFF333333.toInt() }
+            c.drawRoundRect(r, N9.px(12f), N9.px(12f), tile)
+            icons[i]?.let { b ->
+                val inset = N9.px(9f)
+                c.drawBitmap(b, null, RectF(r.left + inset, r.top + inset, r.right - inset, r.bottom - inset), bmpPaint)
+            }
+            val s = TextUtils.ellipsize(labels[i], text, cw - N9.px(6f), TextUtils.TruncateAt.END).toString()
+            val fm = text.fontMetrics
+            c.drawText(s, r.centerX() - text.measureText(s) / 2f, r.bottom + N9.px(8f) - fm.ascent, text)
+        }
+    }
+
+    private fun at(x: Float, y: Float): Int {
+        val cw = width / columns.toFloat()
+        val i = (y / rowH).toInt() * columns + (x / cw).toInt()
+        return if (x >= 0 && y >= 0 && i in labels.indices) i else -1
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    override fun onTouchEvent(e: MotionEvent): Boolean {
+        when (e.actionMasked) {
+            MotionEvent.ACTION_DOWN -> { down = at(e.x, e.y); invalidate() }
+            MotionEvent.ACTION_MOVE -> if (down >= 0 && at(e.x, e.y) != down) { down = -1; invalidate() }
+            MotionEvent.ACTION_UP -> {
+                val i = down; down = -1
+                if (i >= 0 && i != selected) {
+                    selected = i
+                    performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                    onPick(i)
+                }
+                invalidate()
+            }
+            MotionEvent.ACTION_CANCEL -> { down = -1; invalidate() }
         }
         return true
     }

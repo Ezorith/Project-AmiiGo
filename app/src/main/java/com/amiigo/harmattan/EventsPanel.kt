@@ -36,9 +36,10 @@ class EventsPanel(ctx: Context) : FrameLayout(ctx) {
     val pannable = PannableView(ctx)
     private val column = EventsColumn(ctx)
 
+    // Feed and Settings (the Home editor is a pinch away).
     private val toolbar = EditToolbar(ctx, listOf(
-        ctx.getString(R.string.home_editor) to { hideToolbar(); (ctx as? HomeActivity)?.enterCustomize() ?: openHomeSettings(ctx) },
         ctx.getString(R.string.feeds) to { hideToolbar(); openFeeds() },
+        ctx.getString(R.string.settings) to { hideToolbar(); (ctx as? HomeActivity)?.openSettings() ?: openHomeSettings(ctx) },
     ), inRow = true)
 
     /** The feed's settings, as their own sheet. */

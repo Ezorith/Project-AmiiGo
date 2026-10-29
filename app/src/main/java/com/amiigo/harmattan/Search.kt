@@ -150,7 +150,7 @@ class SearchOverlay(private val home: HomeActivity) : FrameLayout(home) {
     private fun results() {
         list.removeAllViews()
         val q = field.text.toString().trim()
-        val apps = Apps.all.distinctBy { it.key }
+        val apps = Apps.all.distinctBy { it.key }.filter { !Apps.isSearch(it) }
         val shown = if (q.isEmpty()) apps.sortedBy { it.label.lowercase() } else {
             val lq = q.lowercase()
             apps.mapNotNull { e ->

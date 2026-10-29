@@ -48,6 +48,12 @@ class HomeActivity : Activity() {
     /** Off to one of home's own sheets (Feed): coming back is not a return from an app. */
     private var inOwnSheet = false
 
+    /** Home's settings (the full list), coming back to Today. */
+    fun openSettings() {
+        inOwnSheet = true
+        openHomeSettings(this)
+    }
+
     /** The feed's settings, as their own sheet over Today. */
     fun openFeedSheet() {
         inOwnSheet = true
@@ -231,7 +237,7 @@ class HomeActivity : Activity() {
         useFastestRefreshRate()
         animator = LaunchAnimator(this, root, home)
         // The Search icon (Android's search app has the N9 Search role) opens the N9 search here.
-        launcher.onOpen = { e, v, r -> if (e.role == "search") openSearch() else animator.open(e, v, r) }
+        launcher.onOpen = { e, v, r -> if (Apps.isSearch(e)) openSearch() else animator.open(e, v, r) }
         switcher.onOpen = { e, v -> animator.open(e, v, Rect(0, 0, v.width, v.height)) }
 
         SystemRecents.onPermissionResult { root.post { Apps.refreshSystemRecents() } }

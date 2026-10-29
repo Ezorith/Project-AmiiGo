@@ -266,20 +266,38 @@ class SettingsActivity : Activity() {
                 preview?.icons = Apps.all.take(28).map { it.icon to it.label }
             }))
 
-        // Icon shape and style: camera-style choices; the preview above shows the result.
-        label("Icon shape")
-        val shapes = Apps.SHAPES.entries.toList()
-        sideways(Segments(this, shapes.map { it.value }, shapes.indexOfFirst { it.key == Apps.iconShape }.coerceAtLeast(0), fit = true) { i ->
-            Apps.setIconShape(shapes[i].key)
-            preview?.icons = Apps.all.take(28).map { it.icon to it.label }
-        })
+        // Icons, then their shape: camera-scene style grids, each tile showing the icon it gives.
+        val sample = Apps.all.firstOrNull { Apps.roleOf(it.pkg) == "telephony" } ?: Apps.all.firstOrNull { !Apps.isSearch(it) }
+        // Shapes shown on an ordinary app (N9 artwork keeps the N9 squircle in some shapes).
+        val shapeSample = Apps.all.firstOrNull { Apps.roleOf(it.pkg) == null && !Apps.isSearch(it) } ?: sample
+        val tileIcon = N9.ipx(46f)
         label("Icons")
         val packs = IconPacks.installed(this)
         val styles = listOf(Apps.STYLE_N9 to "N9", Apps.STYLE_APP to "App icons") + packs.map { it.pkg to it.label }
-        sideways(Segments(this, styles.map { it.second }, styles.indexOfFirst { it.first == Apps.iconStyle }.coerceAtLeast(0), fit = true) { i ->
+        val styleGrid = IconChoices(this, styles.map { it.second }, styles.indexOfFirst { it.first == Apps.iconStyle }.coerceAtLeast(0)) { i ->
             Apps.setIconStyle(styles[i].first)
-            preview?.icons = Apps.all.take(28).map { it.icon to it.label }
-        })
+            refreshAppsPreview()
+        }
+        list.addView(styleGrid, LinearLayout.LayoutParams(-1, -2).apply { topMargin = N9.ipx(6) })
+        label("Icon shape")
+        val shapes = Apps.SHAPES.entries.toList()
+        lateinit var shapeGrid: IconChoices
+        shapeGrid = IconChoices(this, shapes.map { it.value }, shapes.indexOfFirst { it.key == Apps.iconShape }.coerceAtLeast(0)) { i ->
+            Apps.setIconShape(shapes[i].key)
+            refreshAppsPreview()
+            // The style tiles show icons in the new shape.
+            sample?.let { e -> worker.execute {
+                val bs = styles.map { Apps.previewIcon(e, it.first, shapes[i].key, tileIcon) }
+                runOnUiThread { bs.forEachIndexed { j, b -> styleGrid.setIcon(j, b) } }
+            } }
+        }
+        list.addView(shapeGrid, LinearLayout.LayoutParams(-1, -2).apply { topMargin = N9.ipx(6) })
+        sample?.let { e -> worker.execute {
+            val style = Apps.iconStyle; val shape = Apps.iconShape
+            val bs = styles.map { Apps.previewIcon(e, it.first, shape, tileIcon) }
+            val ss = shapes.map { Apps.previewIcon(shapeSample ?: e, style, it.key, tileIcon) }
+            runOnUiThread { bs.forEachIndexed { j, b -> styleGrid.setIcon(j, b) }; ss.forEachIndexed { j, b -> shapeGrid.setIcon(j, b) } }
+        } }
     }
 
     override fun onDestroy() {
@@ -367,12 +385,13 @@ class SettingsActivity : Activity() {
         Section("Applications", R.drawable.n9_settings_applications, {
             val n = Apps.hidden.count { k -> Apps.installed.any { it.key == k } }
             if (n == 0) "No hidden apps" else "$n hidden apps" }) { applications() },
-        Section("Recents", R.drawable.n9_settings_description, {
+        Section("Overview", R.drawable.n9_settings_description, {
             if (SystemRecents.granted()) "Matches the system's recent apps" else "Follows the apps you open" }) { openApps() },
         Section("Today", R.drawable.n9_settings_time_date, {
             when (Weather.mode) { Weather.MODE_OFF -> "Notifications, weather off"; else -> "Notifications, weather" } }) { today() },
         Section("Feed", R.drawable.n9_settings_notification, {
             val n = EventStore.rssSources.size; if (n == 0) "Social apps" else "Social apps, $n sources" }) { feed() },
+        Section("About", R.drawable.n9_app_theme, { "Version $version" }) { about() },
     ) }
 
     private fun permissionsSummary(): String {
@@ -472,12 +491,128 @@ class SettingsActivity : Activity() {
         }
     }
 
+    /** The N9 text query for a new name; empty puts the app's own name back. */
+    private fun renameApp(e: AppEntry) {
+        val field = android.widget.EditText(this).apply {
+            setText(e.label); setSelection(text.length); isSingleLine = true
+            setTextColor(Color.WHITE); typeface = N9.regular
+            setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, N9.px(24f))
+        }
+        val box = android.widget.FrameLayout(this).apply { setPadding(N9.ipx(20), N9.ipx(8), N9.ipx(20), 0); addView(field) }
+        dialog().setTitle("Rename ${e.label}").setView(box)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setNeutralButton("Original name") { _, _ -> Apps.setLabel(e.key, null); build(); refreshAppsPreview() }
+            .setPositiveButton(android.R.string.ok) { _, _ -> Apps.setLabel(e.key, field.text.toString()); build(); refreshAppsPreview() }
+            .show().also { field.requestFocus(); it.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE) }
+    }
+
+    private fun startBackup() {
+        @Suppress("DEPRECATION")
+        runCatching { startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("application/json").putExtra(Intent.EXTRA_TITLE, Backup.suggestedName()), REQ_BACKUP) }
+    }
+
+    private fun startRestore() {
+        @Suppress("DEPRECATION")
+        runCatching { startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("*/*"), REQ_RESTORE) }
+    }
+
+    // ---- About (as the N9's software update page) ----
+
+    private val version: String get() = runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull() ?: "?"
+
+    private fun about() {
+        // The app's icon and name, as the N9 showed the system's.
+        val head = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(0, N9.ipx(16), 0, N9.ipx(12)) }
+        head.addView(android.widget.ImageView(this).apply { setImageBitmap(N9.bitmap(this@SettingsActivity, R.drawable.n9_app_theme)) },
+            LinearLayout.LayoutParams(N9.ipx(80), N9.ipx(80)).apply { marginEnd = N9.ipx(20) })
+        head.addView(text(getString(R.string.app_name), 32f, Color.WHITE))
+        list.addView(head)
+        list.addView(text("Version: $version", 26f, Color.WHITE).apply { setPadding(0, N9.ipx(4), 0, N9.ipx(20)) })
+        // Buttons, as the N9's Create backup / Update device software.
+        aboutButton("Create backup") { startBackup() }
+        aboutButton("Restore backup") { startRestore() }
+        aboutButton("Check for updates") { checkForUpdate() }
+        // Release notes: the changelog that shipped with this version.
+        list.addView(text("Version $version release notes:", 26f, Color.WHITE).apply { setPadding(0, N9.ipx(28), 0, N9.ipx(8)) })
+        val notes = runCatching { assets.open("CHANGELOG.md").bufferedReader().readText() }.getOrDefault("")
+        for (raw in notes.lines()) {
+            val l = raw.trimEnd()
+            if (l.isBlank() || l.startsWith("# ")) continue
+            val plain = l.replace("**", "").replace("`", "")
+            when {
+                l.startsWith("## ") -> list.addView(text(plain.removePrefix("## "), 24f, Color.WHITE, bold = true).apply { setPadding(0, N9.ipx(16), 0, N9.ipx(4)) })
+                l.startsWith("### ") -> list.addView(text(plain.removePrefix("### "), 22f, 0xFFA0A0A0.toInt(), bold = true).apply { setPadding(0, N9.ipx(14), 0, N9.ipx(4)) })
+                l.startsWith("- ") -> list.addView(text("\u2022  " + plain.removePrefix("- "), 22f, 0xFFDDDDDD.toInt()).apply {
+                    setPadding(N9.ipx(4), N9.ipx(3), 0, N9.ipx(3)) })
+                else -> list.addView(text(plain, 22f, 0xFFDDDDDD.toInt()))
+            }
+        }
+    }
+
+    /** A wide N9 push button, centred (MButtonStyle on the inverted theme). */
+    private fun aboutButton(label: String, onTap: () -> Unit) {
+        val b = android.widget.TextView(this).apply {
+            text = label; gravity = Gravity.CENTER; setTextColor(Color.WHITE); typeface = N9.bold
+            setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, N9.px(22f))
+            background = android.graphics.drawable.StateListDrawable().apply {
+                addState(intArrayOf(android.R.attr.state_pressed), Pill(Pill.Kind.PRESSED))
+                addState(intArrayOf(), Pill(Pill.Kind.NORMAL))
+            }
+            isClickable = true
+            setOnClickListener { performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY); onTap() }
+        }
+        list.addView(b, LinearLayout.LayoutParams(N9.ipx(340), N9.ipx(52)).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = N9.ipx(6); bottomMargin = N9.ipx(6) })
+    }
+
+    /** The newest release on GitHub; offers it when it's newer than this one. */
+    private fun checkForUpdate() {
+        Toast.makeText(this, "Checking for updates…", Toast.LENGTH_SHORT).show()
+        Thread {
+            val repo = "Ezorith/Project-AmiiGo"
+            val found = runCatching {
+                fun get(u: String) = (java.net.URL(u).openConnection() as java.net.HttpURLConnection).run {
+                    setRequestProperty("Accept", "application/vnd.github+json"); connectTimeout = 8000; readTimeout = 8000
+                    if (responseCode != 200) null else inputStream.use { it.readBytes().decodeToString() }
+                }
+                get("https://api.github.com/repos/$repo/releases/latest")?.let { org.json.JSONObject(it).let { o -> o.getString("tag_name") to o.optString("html_url") } }
+                    ?: get("https://api.github.com/repos/$repo/tags")?.let { org.json.JSONArray(it).getJSONObject(0).getString("name") to "https://github.com/$repo/releases" }
+            }.getOrNull()
+            runOnUiThread {
+                if (found == null) { Toast.makeText(this, "Couldn't reach GitHub", Toast.LENGTH_SHORT).show(); return@runOnUiThread }
+                val (tag, url) = found
+                if (newer(tag, version)) dialog().setTitle("Update available")
+                    .setMessage("Version ${tag.removePrefix("v")} is available. You have $version.")
+                    .setNegativeButton("Later", null)
+                    .setPositiveButton("Download") { _, _ -> runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url.ifEmpty { "https://github.com/$repo/releases" }))) } }
+                    .show()
+                else Toast.makeText(this, "Harmattan Home is up to date", Toast.LENGTH_SHORT).show()
+            }
+        }.start()
+    }
+
+    /** Whether version [a] (e.g. "v1.0.2-beta") is newer than [b] ("1.0.1"), by its numbers. */
+    private fun newer(a: String, b: String): Boolean {
+        fun nums(s: String) = Regex("\\d+").findAll(s.substringBefore('-')).map { it.value.toInt() }.toList()
+        val x = nums(a); val y = nums(b)
+        for (i in 0 until maxOf(x.size, y.size)) { val p = x.getOrElse(i) { 0 }; val q = y.getOrElse(i) { 0 }; if (p != q) return p > q }
+        return false
+    }
+
+    private fun refreshAppsPreview() { appsPreview?.icons = Apps.all.take(28).map { it.icon to it.label } }
+
     private fun applications() {
         val hiddenCount = Apps.hidden.count { k -> Apps.installed.any { it.key == k } }
         item("Hidden apps", if (hiddenCount == 0) "None — tap to choose apps to hide" else "$hiddenCount hidden — tap to change") {
             pickApps(this, "Hidden apps", "tap apps to hide them from Applications",
                 Apps.installed.filter { it.pkg != packageName }.sortedBy { it.label.lowercase() }, Apps.hidden,
                 keyOf = { it.key }, dim = true) { Apps.setHidden(it); build() }
+        }
+        val renamed = Apps.installed.count { Apps.labelFor(it.key) != null }
+        item("Rename apps", if (renamed == 0) "Tap an app to give it your own name" else "$renamed renamed") {
+            pickApps(this, "Rename apps", "tap an app to rename it", Apps.all.sortedBy { it.label.lowercase() }, emptySet(),
+                keyOf = { it.key }, dim = false, one = { e -> renameApp(e) }) {}
         }
     }
 
@@ -515,16 +650,8 @@ class SettingsActivity : Activity() {
         }
         if (matching) switchItem("Live previews", null, Apps.livePreviews) { Apps.setLivePreviews(it) }
         group("Backup")
-        item("Back up home", null) {
-            @Suppress("DEPRECATION")
-            runCatching { startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
-                .setType("application/json").putExtra(Intent.EXTRA_TITLE, Backup.suggestedName()), REQ_BACKUP) }
-        }
-        item("Restore from a backup", null) {
-            @Suppress("DEPRECATION")
-            runCatching { startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
-                .setType("*/*"), REQ_RESTORE) }
-        }
+        item("Back up home", null) { startBackup() }
+        item("Restore from a backup", null) { startRestore() }
         note("Saves app positions, folders, hidden apps, sizes, the wallpaper, the feed and the weather place to a file. Recents aren't included.")
     }
 
