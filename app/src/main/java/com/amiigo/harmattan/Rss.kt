@@ -25,7 +25,7 @@ object Rss {
         YOUTUBE("YouTube channel", "@handle or channel link"),
         REDDIT("Reddit", "r/subreddit or u/username"),
         TUMBLR("Tumblr blog", "blog name"),
-        WEBSITE("Website or feed address", "e.g. geekzone.co.nz or a .rss link"),
+        WEBSITE("Website or feed address", "e.g. a site's address or a .rss link"),
     }
 
     private const val BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"

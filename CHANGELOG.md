@@ -11,6 +11,8 @@
 - **Dark top switch** (Customize Today → Wallpaper) to turn off the dark shade behind the date and weather.
 - **Phone wallpaper too** (Customize Today → Wallpaper): also sets your picture as Android's home wallpaper, so Recents shows the same one. Off by default; the lock screen keeps its own.
 
+- **Backup and restore** (Customize Recents → Backup): saves app positions, folders, hidden apps, sizes and icon settings, the wallpaper and its settings, feed sources and apps, and the weather place to one file you can keep anywhere. Restoring replaces them and restarts home. Recents aren't included.
+
 ### Changed
 - **Endless parallax:** the wallpaper keeps scrolling the same way as you swipe round the views, a quarter of the screen per view. Every other copy is mirrored so the joins don't show.
 - **Dark top** fades in as Today arrives, instead of growing with the swipe, and fades out as you scroll down the feed.
@@ -26,6 +28,7 @@
 - A folder could keep its ✕ after leaving edit mode (once an app had been dropped into an empty folder).
 - Holding Today while the feed was still moving (or moving under the finger) brought up the toolbar.
 - Holding Today left the wallpaper and the area below the notifications undimmed, with a gap at the left edge.
+- The Add a source example no longer names a particular website.
 - Tapping Done on the Feed page went to Recents instead of back to Today.
 - Some photos were saved cut off, with a black lower part (and passed to Android that way). Android's photo picker hands apps a filtered copy that was damaged for some Samsung photos; wallpapers are now chosen with Android's file chooser, and a picture is only swapped in once it's been read and saved whole.
 

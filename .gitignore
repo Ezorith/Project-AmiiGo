@@ -12,3 +12,7 @@ local.properties
 *.iml
 .idea/
 captures/
+
+# Local-only: reference photo and mockup captures (the README uses images uploaded to GitHub)
+Nokia-N9-screens.jpg
+docs/mockups/

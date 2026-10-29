@@ -514,6 +514,18 @@ class SettingsActivity : Activity() {
             }
         }
         if (matching) switchItem("Live previews", null, Apps.livePreviews) { Apps.setLivePreviews(it) }
+        group("Backup")
+        item("Back up home", null) {
+            @Suppress("DEPRECATION")
+            runCatching { startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
+                .setType("application/json").putExtra(Intent.EXTRA_TITLE, Backup.suggestedName()), REQ_BACKUP) }
+        }
+        item("Restore from a backup", null) {
+            @Suppress("DEPRECATION")
+            runCatching { startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
+                .setType("*/*"), REQ_RESTORE) }
+        }
+        note("Saves app positions, folders, hidden apps, sizes, the wallpaper, the feed and the weather place to a file. Recents aren't included.")
     }
 
     private fun today() {
@@ -670,6 +682,36 @@ class SettingsActivity : Activity() {
         @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
         val uri = data?.data
+        if (resultCode == RESULT_OK && uri != null && requestCode == REQ_BACKUP) {
+            Thread {
+                val ok = Backup.save(this, uri)
+                runOnUiThread { Toast.makeText(this, if (ok) "Home backed up" else "Couldn't save the backup", Toast.LENGTH_SHORT).show() }
+            }.start()
+            return
+        }
+        if (resultCode == RESULT_OK && uri != null && requestCode == REQ_RESTORE) {
+            Thread {
+                val b = Backup.read(this, uri)
+                runOnUiThread {
+                    if (b == null) { Toast.makeText(this, "That isn't a Harmattan Home backup", Toast.LENGTH_SHORT).show(); return@runOnUiThread }
+                    val date = java.text.DateFormat.getDateTimeInstance().format(java.util.Date(b.optLong("saved")))
+                    dialog().setTitle("Restore this backup?")
+                        .setMessage("From $date. Your current layout, folders, wallpaper, feed and weather settings will be replaced.")
+                        .setNegativeButton(android.R.string.cancel, null)
+                        .setPositiveButton("Restore") { _, _ ->
+                            Thread {
+                                Backup.restore(this, b)
+                                // Home keeps its settings in memory: start it afresh with the restored ones.
+                                runOnUiThread {
+                                    startActivity(Intent(this, HomeActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
+                                    android.os.Handler(mainLooper).postDelayed({ Runtime.getRuntime().exit(0) }, 300)
+                                }
+                            }.start()
+                        }.show()
+                }
+            }.start()
+            return
+        }
         if (requestCode != REQ_WALLPAPER || resultCode != RESULT_OK || uri == null) return
         Thread {
             val ok = Wallpaper.save(this, uri)
@@ -717,6 +759,8 @@ class SettingsActivity : Activity() {
     companion object {
         private const val REQ_LOCATION = 0x7E
         private const val REQ_WALLPAPER = 0x7F
+        private const val REQ_BACKUP = 0x80
+        private const val REQ_RESTORE = 0x81
         const val EXTRA_PANEL = "panel"
     }
 
