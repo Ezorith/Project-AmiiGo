@@ -337,6 +337,13 @@ object Apps {
     fun setIconShape(s: String) { prefs.edit().putString("icon_shape", s).apply(); reload() }
 
     /** Icon size relative to the N9's 8mm (80px) launcher icons. */
+    /** Notification badges on app icons: [BADGES_OFF] (as the N9), [BADGES_DOT] or [BADGES_COUNT]. */
+    val badges: String get() = prefs.getString("app_badges", BADGES_OFF)!!
+    fun setBadges(v: String) { prefs.edit().putString("app_badges", v).apply(); listeners.forEach { it() } }
+    const val BADGES_OFF = "off"
+    const val BADGES_DOT = "dot"
+    const val BADGES_COUNT = "count"
+
     val iconScale: Float get() = prefs.getFloat("icon_scale", 1f)
     fun setIconScale(f: Float) { prefs.edit().putFloat("icon_scale", f).apply(); reload() }
 
@@ -455,6 +462,9 @@ object Apps {
         val b = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         d.setBounds(0, 0, size, size); d.draw(Canvas(b)); return b
     }
+
+    /** [src] (square) cut to the N9 icon shape. */
+    fun n9Shaped(src: Bitmap): Bitmap = applyMask(src, shapeMask(SHAPE_N9, src.width))
 
     private fun applyMask(src: Bitmap, mask: Bitmap): Bitmap {
         val size = src.width

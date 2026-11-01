@@ -73,6 +73,15 @@ class EventsPanel(ctx: Context) : FrameLayout(ctx) {
             backToTop.bottomInset = v
         }
 
+    /** Nothing to tap at screen point ([x], [y]) in Today (for double tap to sleep). */
+    fun isEmptyAt(x: Float, y: Float): Boolean {
+        val me = IntArray(2); getLocationOnScreen(me)
+        if (toolbar.isUp || backToTop.inStrip((y - me[1]) / screenScale(this))) return false
+        val loc = IntArray(2); column.getLocationOnScreen(loc)
+        val k = screenScale(column)
+        return column.isEmptyAt((x - loc[0]) / k, (y - loc[1]) / k)
+    }
+
     /** "Back to top" shows once [BACK_TO_TOP_AFTER] feed posts have scrolled up out of view. */
     private fun updateBackToTop() {
         val post = column.feedRow(BACK_TO_TOP_AFTER - 1)
@@ -267,6 +276,13 @@ class EventsColumn(ctx: Context) : ViewGroup(ctx) {
 
     fun rowFor(key: String) = rows[key]
     fun rowsList(): List<Row> = rows.values.filter { it.tag != "gone" }
+
+    /** Nothing to tap at ([x], [y]) in the column's coordinates: a gap, a divider, or below the rows. */
+    fun isEmptyAt(x: Float, y: Float): Boolean {
+        if (editing) return false
+        val r = rowsList().firstOrNull { y >= it.top && y < it.bottom } ?: return true
+        return r is DividerRow || r is SeparatorRow
+    }
     /** The [i]th feed post's row (0 = the newest). */
     fun feedRow(i: Int): Row? = rows.entries.filter { it.key.startsWith("f:") }.getOrNull(i)?.value
 
@@ -603,7 +619,7 @@ class BannerRow(ctx: Context, item: EventItem) : Row(ctx), ItemRow {
         val bottom = height - N9.px(8f) - margin
         drawPressed(canvas, RectF(0f, margin, width - N9.px(14f), bottom))
         item.icon?.let {
-            val s = N9.px(64f)
+            val s = N9.px(64f) * EventStore.iconSpan(it)
             canvas.drawBitmap(it, null, RectF(N9.px(2f), margin + N9.px(10f), N9.px(2f) + s, margin + N9.px(10f) + s), iconPaint)
         }
         var y = margin + N9.px(10f)
@@ -671,7 +687,7 @@ class FeedRow(ctx: Context, item: EventItem) : Row(ctx), ItemRow {
     override fun onDraw(canvas: Canvas) {
         drawPressed(canvas, RectF(0f, 0f, width - N9.px(14f), height.toFloat()))
         item.icon?.let {
-            val s = N9.px(64f)
+            val s = N9.px(64f) * EventStore.iconSpan(it)
             canvas.drawBitmap(it, null, RectF(N9.px(2f), N9.px(8f), N9.px(2f) + s, N9.px(8f) + s), iconPaint)
         }
         var y = N9.px(8f)

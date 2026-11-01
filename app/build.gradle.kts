@@ -11,8 +11,8 @@ android {
         applicationId = "com.amiigo.harmattan"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.0.2-beta"
+        versionCode = 4
+        versionName = "1.0.3-beta"
     }
 
     buildTypes {

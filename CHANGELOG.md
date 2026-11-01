@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.3-beta — 1 November 2026
+
+### Added
+- **Notification badges** (Customize Applications): a dot or a count on the icons of apps with notifications, and the total on folders. Off by default, as on the N9, which kept notifications in its Events view.
+- **Double tap to sleep** (Home settings → Appearance): double tap an empty part of home or the status bar to turn the screen off, as the power key does (fingerprint and face unlock still work). Uses Shizuku when it's allowed, otherwise Harmattan Home's accessibility service, which only turns the screen off.
+
+### Changed
+- **App badges on notifications and feed posts** show the app's icon in the N9 shape, hanging off the picture's bottom-right corner, as in Android's notification pop-ups.
+
 ## 1.0.2-beta — 29 October 2026
 
 ### Added

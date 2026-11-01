@@ -51,6 +51,7 @@ class LauncherPanel(ctx: Context) : FrameLayout(ctx) {
         addView(pannable, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         addView(toolbar, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT, Gravity.BOTTOM))
         Apps.addListener { grid.sync() }
+        EventStore.addBadgeListener { grid.invalidate() }
         grid.sync()
     }
 
@@ -676,6 +677,33 @@ class LauncherGrid(ctx: Context, private val panel: LauncherPanel) : ViewGroup(c
             badgePaint.alpha = (b.badgeAlpha * 255 * (if (b in mainButtons && openFolder != null && b.folder !== openFolder) 0.5f else 1f)).toInt().coerceIn(0, 255)
             canvas.drawBitmap(closeBmp, null, dst, badgePaint)
         }
+        drawNotificationBadges(canvas)
+    }
+
+    private val dotPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+    private val countPaint = N9.textPaint(N9.bold, 16f, android.graphics.Color.WHITE)
+
+    /**
+     * Notification dots or counts at each icon's top right (not on the N9, which kept notifications
+     * in its Events view; an option). Folders show their apps' total. Hidden in edit mode, where the
+     * ✕ sits in that corner.
+     */
+    private fun drawNotificationBadges(canvas: Canvas) {
+        val mode = Apps.badges
+        if (mode == Apps.BADGES_OFF || editMode) return
+        val counts = EventStore.badgeCounts
+        if (counts.isEmpty()) return
+        val list = mainButtons + (if (folderP > 0.99f) folderButtons else emptyList())
+        for (b in list) {
+            if (b === dragged) continue
+            val n = b.entry?.let { counts[it.pkg] } ?: b.folder?.apps?.sumOf { counts[it.pkg] ?: 0 } ?: 0
+            if (n <= 0) continue
+            val cx = b.left + b.translationX + N9.px(BADGE_X + BADGE_SIZE / 2 - 8f)
+            val cy = b.top + b.translationY + N9.px(BADGE_Y + BADGE_SIZE / 2 + 8f)
+            val faded = b in mainButtons && openFolder != null && b.folder !== openFolder
+            val a = ((if (faded) 0.5f else 1f) * b.alpha * 255).toInt().coerceIn(0, 255)
+            drawAppBadge(canvas, cx, cy, n, mode, 1f, a, dotPaint, countPaint)
+        }
     }
 
     /** Folder container: black, 0.1mm border, 1mm gradients, 1.5mm x 1mm arrow head toward the folder icon. */
@@ -740,6 +768,10 @@ class LauncherGrid(ctx: Context, private val panel: LauncherPanel) : ViewGroup(c
         if (b != null) startDrag(b)
         else performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
     }
+
+    /** Nothing to tap at ([x], [y]) in the grid's own coordinates (no app, folder or open folder). */
+    fun isEmptyAt(x: Float, y: Float): Boolean =
+        !editMode && buttonAt(x, y) == null && !(openFolder != null && folderP > 0.01f && boxRect().contains(x, y))
 
     private fun buttonAt(x: Float, y: Float): LauncherButton? {
         val box = if (openFolder != null && folderP > 0.5f) boxRect() else null
@@ -990,4 +1022,35 @@ class LauncherGrid(ctx: Context, private val panel: LauncherPanel) : ViewGroup(c
         commit()
         invalidate()
     }
+}
+
+
+/**
+ * A notification dot or count centred at ([cx], [cy]), [k] times its Applications size: the N9's
+ * attention red (COLOR_WARNING #DA201E), a little lighter at the top. [text] is bold 16 N9 px.
+ */
+fun drawAppBadge(canvas: Canvas, cx: Float, cy: Float, n: Int, mode: String, k: Float, alpha: Int,
+                 paint: android.graphics.Paint, text: android.graphics.Paint) {
+    fun red(top: Float, bottom: Float) {
+        paint.shader = android.graphics.LinearGradient(0f, top, 0f, bottom, 0xFFEE4B42.toInt(), 0xFFC81A18.toInt(), android.graphics.Shader.TileMode.CLAMP)
+        paint.alpha = alpha
+    }
+    if (mode == Apps.BADGES_DOT) {
+        val r = N9.px(9f) * k
+        red(cy - r, cy + r)
+        canvas.drawCircle(cx, cy, r, paint)
+        return
+    }
+    val label = if (n > 99) "99+" else n.toString()
+    val size0 = text.textSize
+    text.textSize = size0 * k
+    val h = N9.px(26f) * k
+    val w = maxOf(h, text.measureText(label) + N9.px(14f) * k)
+    val rect = RectF(cx - w / 2f, cy - h / 2f, cx + w / 2f, cy + h / 2f)
+    red(rect.top, rect.bottom)
+    canvas.drawRoundRect(rect, h / 2f, h / 2f, paint)
+    text.alpha = alpha
+    val fm = text.fontMetrics
+    canvas.drawText(label, cx - text.measureText(label) / 2f, cy - (fm.ascent + fm.descent) / 2f, text)
+    text.textSize = size0
 }

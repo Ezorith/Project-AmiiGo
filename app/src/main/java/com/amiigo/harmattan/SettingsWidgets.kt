@@ -223,6 +223,11 @@ class HomePreview(ctx: Context) : PanelPreview(ctx) {
     var iconScale = 1f; set(v) { field = v; invalidate() }
     var textScale = 1f; set(v) { field = v; invalidate() }
     var icons: List<Pair<Bitmap, String>> = emptyList(); set(v) { field = v; invalidate() }
+    /** Notification counts for [icons] (same order), shown as the Applications view shows them. */
+    var badges: List<Int> = emptyList(); set(v) { field = v; invalidate() }
+    var badgeMode: String = Apps.badges; set(v) { field = v; invalidate() }
+    private val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val badgeText = N9.textPaint(N9.bold, 16f, Color.WHITE)
 
     private val bmpPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val text = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { typeface = N9.regular; color = Color.WHITE }
@@ -247,6 +252,12 @@ class HomePreview(ctx: Context) : PanelPreview(ctx) {
             val ix = x + (bw * u - isz) / 2f
             val iy = y + (gm.iconBottom - iconN9) * u
             c.drawBitmap(b, null, RectF(ix, iy, ix + isz, iy + isz), bmpPaint)
+            badges.getOrNull(i)?.takeIf { it > 0 && badgeMode != Apps.BADGES_OFF }?.let { n ->
+                // Where the Applications view puts it, relative to the button.
+                val k = u / N9.s
+                drawAppBadge(c, x + N9.px(LauncherGrid.BADGE_X + LauncherGrid.BADGE_SIZE / 2 - 8f) * k,
+                    y + N9.px(LauncherGrid.BADGE_Y + LauncherGrid.BADGE_SIZE / 2 + 8f) * k, n, badgeMode, k, 255, badgePaint, badgeText)
+            }
             val label = TextUtils.ellipsize(name, text, bw * u, TextUtils.TruncateAt.END).toString()
             c.drawText(label, x + (bw * u - text.measureText(label)) / 2f, y + (gm.iconBottom + 8f) * u - text.ascent(), text)
         }

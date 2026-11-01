@@ -166,7 +166,7 @@ class TodayPreview(ctx: Context) : PanelPreview(ctx) {
             // The heading and Clear only with something to clear, as in Today.
             if (notes.any { it.clearable }) { heading(c, R.string.qtn_noti_title, R.string.qtn_noti_clear, left, right, top, u, t); top += 52f * u }
             for (n in notes) {
-                n.icon?.let { c.drawBitmap(it, null, RectF(left + 2f * u, top + 10f * u, left + 66f * u, top + 74f * u), bmp) }
+                n.icon?.let { val s = 64f * u * EventStore.iconSpan(it); c.drawBitmap(it, null, RectF(left + 2f * u, top + 10f * u, left + 2f * u + s, top + 10f * u + s), bmp) }
                 val tx = left + 82f * u
                 text(c, n.title, tx, top + 30f * u * t, 22f * u * t, N9.regular, Color.WHITE, right - tx)
                 n.subtitle?.let { text(c, it, tx, top + 54f * u * t, 16f * u * t, N9.regular, 0xFFC8C8C8.toInt(), right - tx) }
@@ -181,7 +181,7 @@ class TodayPreview(ctx: Context) : PanelPreview(ctx) {
         heading(c, R.string.qtn_home_events_feed_title, R.string.qtn_home_events_feed_refresh, left, right, top, u, t)
         top += 52f * u
         for (f in feed) {
-            f.icon?.let { c.drawBitmap(it, null, RectF(left + 2f * u, top + 8f * u, left + 66f * u, top + 72f * u), bmp) }
+            f.icon?.let { val s = 64f * u * EventStore.iconSpan(it); c.drawBitmap(it, null, RectF(left + 2f * u, top + 8f * u, left + 2f * u + s, top + 8f * u + s), bmp) }
             val tx = left + 82f * u
             text(c, f.title, tx, top + 28f * u * t, 22f * u * t, N9.bold, Color.WHITE, right - tx)
             (f.body ?: f.subtitle)?.let { text(c, it, tx, top + 54f * u * t, 22f * u * t, N9.regular, Color.WHITE, right - tx) }

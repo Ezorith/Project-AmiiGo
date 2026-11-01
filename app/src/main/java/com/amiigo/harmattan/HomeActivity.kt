@@ -89,7 +89,54 @@ class HomeActivity : Activity() {
         })
     }
 
+    // ---- double tap to sleep (an empty part of a view, or the status bar) ----
+
+    private var tapDownAt = 0L
+    private var tapDownX = 0f
+    private var tapDownY = 0f
+    private var lastTapAt = 0L
+    private var lastTapX = 0f
+    private var lastTapY = 0f
+    private var tapCancelled = false
+
+    /** Whether nothing takes a tap at screen point ([x], [y]) on home as it is now. */
+    private fun emptyAt(x: Float, y: Float): Boolean {
+        if (customizing || search.isOpen) return false
+        if (y < home.top) return true // the status bar
+        fun local(v: View): Pair<Float, Float> {
+            val loc = IntArray(2); v.getLocationOnScreen(loc)
+            val k = screenScale(v)
+            return (x - loc[0]) / k to (y - loc[1]) / k
+        }
+        return when (home.current) {
+            LAUNCHER -> local(launcher.grid).let { (lx, ly) -> launcher.grid.isEmptyAt(lx, ly) }
+            SWITCHER -> local(switcher.grid).let { (lx, ly) -> switcher.grid.isEmptyAt(lx, ly) }
+            else -> events.isEmptyAt(x, y)
+        }
+    }
+
+    private fun trackDoubleTap(ev: android.view.MotionEvent) {
+        if (!Sleep.enabled(this)) return
+        val slop = N9.px(LauncherGrid.MOVE_THRESHOLD)
+        when (ev.actionMasked) {
+            android.view.MotionEvent.ACTION_DOWN -> { tapDownAt = ev.eventTime; tapDownX = ev.rawX; tapDownY = ev.rawY; tapCancelled = !emptyAt(ev.rawX, ev.rawY) }
+            android.view.MotionEvent.ACTION_POINTER_DOWN -> tapCancelled = true
+            android.view.MotionEvent.ACTION_MOVE -> if (kotlin.math.abs(ev.rawX - tapDownX) > slop || kotlin.math.abs(ev.rawY - tapDownY) > slop) tapCancelled = true
+            android.view.MotionEvent.ACTION_CANCEL -> { tapCancelled = true; lastTapAt = 0L }
+            android.view.MotionEvent.ACTION_UP -> {
+                if (tapCancelled || ev.eventTime - tapDownAt > 250) { lastTapAt = 0L; return }
+                val second = lastTapAt != 0L && tapDownAt - lastTapAt < 300 &&
+                    kotlin.math.abs(ev.rawX - lastTapX) < slop * 2 && kotlin.math.abs(ev.rawY - lastTapY) < slop * 2
+                if (second) {
+                    lastTapAt = 0L
+                    if (!Sleep.now(this)) android.widget.Toast.makeText(this, "Double tap to sleep needs Shizuku or its accessibility service (Home settings → Appearance)", android.widget.Toast.LENGTH_LONG).show()
+                } else { lastTapAt = ev.eventTime; lastTapX = ev.rawX; lastTapY = ev.rawY }
+            }
+        }
+    }
+
     override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        trackDoubleTap(ev)
         if (::search.isInitialized && !search.isOpen && !customizing && home.current != SWITCHER) {
             lastEvent = ev
             pinch.onTouchEvent(ev)

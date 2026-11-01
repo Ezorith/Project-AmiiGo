@@ -368,6 +368,9 @@ class SwitcherGrid(ctx: Context, private val panel: SwitcherPanel) : ViewGroup(c
         }
     })
 
+    /** No tile at ([x], [y]) in the grid's own coordinates. */
+    fun isEmptyAt(x: Float, y: Float) = !editMode && indexAt(x, y) < 0
+
     private fun indexAt(x: Float, y: Float): Int {
         for ((i, t) in tiles.withIndex()) if (x >= t.left && x < t.right && y >= t.top && y < t.bottom) return i
         return -1

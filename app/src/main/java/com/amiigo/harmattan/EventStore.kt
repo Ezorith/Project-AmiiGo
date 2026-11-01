@@ -134,7 +134,28 @@ object EventStore {
 
     // ---- notifications ----
 
+    // ---- app badges (Customize Applications → Notification badges) ----
+
+    /** Notifications per app, for the dots / counts on Applications' icons. Ongoing ones don't count. */
+    @Volatile var badgeCounts: Map<String, Int> = emptyMap()
+        private set
+    private val badgeListeners = mutableListOf<() -> Unit>()
+    fun addBadgeListener(l: () -> Unit) { badgeListeners += l }
+
+    private fun recountBadges() {
+        val active = runCatching { service?.activeNotifications }.getOrNull() ?: return
+        val m = HashMap<String, Int>()
+        for (sbn in active) {
+            val n = sbn.notification
+            if (sbn.isOngoing || n.flags and Notification.FLAG_GROUP_SUMMARY != 0) continue
+            if (sbn.packageName == app.packageName) continue
+            m[sbn.packageName] = (m[sbn.packageName] ?: 0) + 1
+        }
+        if (m != badgeCounts) { badgeCounts = m; main.post { badgeListeners.forEach { it() } } }
+    }
+
     fun setActive(list: Array<StatusBarNotification>) {
+        recountBadges()
         val items = ArrayList<EventItem>()
         val feedItems = ArrayList<EventItem>()
         for (sbn in list) {
@@ -145,6 +166,7 @@ object EventStore {
     }
 
     fun onPosted(sbn: StatusBarNotification) {
+        recountBadges()
         if (isFeed(sbn)) {
             feedItem(sbn)?.let { unseen = true; mergeFeed(listOf(it)) }
             return
@@ -156,6 +178,7 @@ object EventStore {
     }
 
     fun onRemoved(sbn: StatusBarNotification) {
+        recountBadges()
         val before = notifications.size
         real = real.filter { it.key != sbn.key }
         if (notifications.size != before) changed()
@@ -386,19 +409,38 @@ object EventStore {
      * A feed avatar with where it came from as a small badge at its bottom right (Reddit, YouTube, the
      * app that posted it), set on a black ring so it reads against any picture.
      */
+    /**
+     * How much bigger than the 64 px icon box [b] is drawn: badged pictures carry their badge hanging
+     * off the bottom-right corner, so their bitmap reaches past the picture by [BADGE_OUT].
+     */
+    fun iconSpan(b: Bitmap): Float = b.width / N9.ipx(64).toFloat()
+    private const val BADGE_OUT = 10f
+
     fun withBadge(avatar: Bitmap, badge: Bitmap?): Bitmap {
         if (badge == null) return avatar
-        val size = N9.ipx(64)
+        val pic = N9.ipx(64)
+        val size = N9.ipx(64f + BADGE_OUT)
         val out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val c = Canvas(out)
         val p = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-        c.drawBitmap(avatar, null, Rect(0, 0, size, size), p)
-        // The logo as it is (its own outline and transparency), fitted into the bottom-right corner.
+        // The picture at its usual size; the badge sits on its corner, mostly outside it.
+        c.drawBitmap(avatar, null, Rect(0, 0, pic, pic), p)
+        // As Android's notification pop-up shows it, but in the N9's icon shape: the app's icon on
+        // white, hanging off the picture's bottom-right corner.
         val logo = trimmed(badge)
-        val box = N9.px(24f)
-        val k = box / maxOf(logo.width, logo.height)
-        val w = logo.width * k; val h = logo.height * k
-        c.drawBitmap(logo, null, android.graphics.RectF(size - w, size - h, size.toFloat(), size.toFloat()), p)
+        val d = N9.ipx(24f)
+        val tile = Bitmap.createBitmap(d, d, Bitmap.Config.ARGB_8888)
+        Canvas(tile).apply {
+            drawColor(Color.WHITE)
+            // Apps' badges are their full icon, edge to edge; anything else (a site's icon) sits inside.
+            val full = logo === badge && badge.width == badge.height
+            val box = if (full) d.toFloat() else d * 0.66f
+            val k = box / maxOf(logo.width, logo.height)
+            val w = logo.width * k; val h = logo.height * k
+            drawBitmap(logo, null, android.graphics.RectF((d - w) / 2f, (d - h) / 2f, (d + w) / 2f, (d + h) / 2f), p)
+        }
+        val r = size.toFloat() - N9.px(1f); val l = r - d
+        c.drawBitmap(Apps.n9Shaped(tile), null, android.graphics.RectF(l, l, r, r), p)
         return out
     }
 
@@ -425,9 +467,20 @@ object EventStore {
         val made = runCatching {
             val d = app.packageManager.getApplicationIcon(pkg)
             val size = N9.ipx(96)
-            val fg = (d as? android.graphics.drawable.AdaptiveIconDrawable)?.foreground
-            val logo = fg?.let { drawableBitmap(it, size, size) }?.let { trimmed(it) }?.takeIf { !mostlyLight(it) }
-            logo ?: trimmed(drawableBitmap(d, size, size))
+            val out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+            val c = Canvas(out)
+            if (d is android.graphics.drawable.AdaptiveIconDrawable) {
+                // As Android's own badges: the whole icon, background and logo, without the device's
+                // mask (the disc is the mask). Layers are 108 units with the middle 72 shown.
+                val bleed = size / 4
+                for (layer in listOf(d.background, d.foreground)) layer?.let { it.setBounds(-bleed, -bleed, size + bleed, size + bleed); it.draw(c) }
+            } else {
+                // A plain icon: on white, a little inset.
+                c.drawColor(Color.WHITE)
+                val inset = size / 8
+                d.setBounds(inset, inset, size - inset, size - inset); d.draw(c)
+            }
+            out
         }.getOrNull()
         badges[pkg] = made
         made

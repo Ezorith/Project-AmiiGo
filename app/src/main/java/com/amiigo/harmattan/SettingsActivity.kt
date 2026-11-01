@@ -263,7 +263,7 @@ class SettingsActivity : Activity() {
             onPick = { i ->
                 // Rebuilding every icon takes a moment: only once the finger lets go.
                 Apps.setIconScale(sizes[i])
-                preview?.icons = Apps.all.take(28).map { it.icon to it.label }
+                preview?.icons = Apps.all.take(28).map { it.icon to it.label }; preview?.badges = Apps.all.take(28).map { EventStore.badgeCounts[it.pkg] ?: 0 }
             }))
 
         // Icons, then their shape: camera-scene style grids, each tile showing the icon it gives.
@@ -423,7 +423,7 @@ class SettingsActivity : Activity() {
             val pv: View = when (sheet) {
                 "launcher" -> HomePreview(this).apply {
                     uiScale = Apps.appsScale; iconScale = Apps.iconScale; textScale = Apps.textScale
-                    icons = Apps.all.take(28).map { it.icon to it.label }
+                    icons = Apps.all.take(28).map { it.icon to it.label }; badges = Apps.all.take(28).map { EventStore.badgeCounts[it.pkg] ?: 0 }
                 }.also { appsPreview = it }
                 "switcher" -> RecentsPreview(this).also { recentsPreview = it }
                 else -> TodayPreview(this).also { todayPreview = it }
@@ -489,6 +489,19 @@ class SettingsActivity : Activity() {
     private fun appearancePage() {
         appearance()
         group("Gestures")
+        switchItem("Double tap to sleep", "On an empty part of home or the status bar", Sleep.enabled(this)) { on ->
+            Sleep.setEnabled(this, on)
+            // Without Shizuku, the screen is turned off by Harmattan Home's accessibility service.
+            if (on && !Sleep.ready(this)) {
+                if (android.os.Build.VERSION.SDK_INT < 28) Toast.makeText(this, "Needs Shizuku on this Android version", Toast.LENGTH_LONG).show()
+                else dialog().setTitle("Turn on the sleep service")
+                    .setMessage("To turn the screen off, Harmattan Home needs its accessibility service (it doesn't read anything on screen). " +
+                        "In the next screen, tap \"Harmattan Home: double tap to sleep\" and switch it on.")
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .setPositiveButton("Open settings") { _, _ -> runCatching { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) } }
+                    .show()
+            }
+        }
         switchItem("Gesture pill", if (Apps.showGesturePill) "Shown at the bottom of home" else "Hidden; swiping up still works",
             Apps.showGesturePill) { Apps.setShowGesturePill(it) }
         if (Apps.showGesturePill) switchItem("Black bar behind the gesture pill", if (Apps.blackNavBar) "The pill sits on a black bar" else "The pill floats over home",
@@ -615,7 +628,7 @@ class SettingsActivity : Activity() {
         return false
     }
 
-    private fun refreshAppsPreview() { appsPreview?.icons = Apps.all.take(28).map { it.icon to it.label } }
+    private fun refreshAppsPreview() { appsPreview?.icons = Apps.all.take(28).map { it.icon to it.label }; appsPreview?.badges = Apps.all.take(28).map { EventStore.badgeCounts[it.pkg] ?: 0 } }
 
     private fun applications() {
         val hiddenCount = Apps.hidden.count { k -> Apps.installed.any { it.key == k } }
@@ -624,6 +637,17 @@ class SettingsActivity : Activity() {
                 Apps.installed.filter { it.pkg != packageName }.sortedBy { it.label.lowercase() }, Apps.hidden,
                 keyOf = { it.key }, dim = true) { Apps.setHidden(it); build() }
         }
+        // Dots or counts for apps with notifications (the N9 had neither).
+        val row = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, N9.ipx(12), 0, N9.ipx(12)) }
+        row.addView(text("Notification badges", 26f, Color.WHITE, bold = true))
+        val modes = listOf(Apps.BADGES_OFF, Apps.BADGES_DOT, Apps.BADGES_COUNT)
+        row.addView(Segments(this, listOf("Off", "Dot", "Count"), modes.indexOf(Apps.badges).coerceAtLeast(0), fit = true) { i ->
+            Apps.setBadges(modes[i])
+            appsPreview?.badgeMode = modes[i]
+        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = N9.ipx(10) })
+        list.addView(row)
+        lastRow = null
+        if (!notificationsAllowed()) note("Badges need notification access (Permissions).")
         val renamed = Apps.installed.count { Apps.labelFor(it.key) != null }
         item("Rename apps", if (renamed == 0) "Tap an app to give it your own name" else "$renamed renamed") {
             pickApps(this, "Rename apps", "tap an app to rename it", Apps.all.sortedBy { it.label.lowercase() }, emptySet(),
