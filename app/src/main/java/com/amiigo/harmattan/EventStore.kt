@@ -414,7 +414,7 @@ object EventStore {
      * off the bottom-right corner, so their bitmap reaches past the picture by [BADGE_OUT].
      */
     fun iconSpan(b: Bitmap): Float = b.width / N9.ipx(64).toFloat()
-    private const val BADGE_OUT = 10f
+    private const val BADGE_OUT = 7f
 
     fun withBadge(avatar: Bitmap, badge: Bitmap?): Bitmap {
         if (badge == null) return avatar
@@ -428,7 +428,7 @@ object EventStore {
         // As Android's notification pop-up shows it, but in the N9's icon shape: the app's icon on
         // white, hanging off the picture's bottom-right corner.
         val logo = trimmed(badge)
-        val d = N9.ipx(24f)
+        val d = N9.ipx(26f)
         val tile = Bitmap.createBitmap(d, d, Bitmap.Config.ARGB_8888)
         Canvas(tile).apply {
             drawColor(Color.WHITE)
